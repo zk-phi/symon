@@ -127,7 +127,7 @@ BEFORE calling `symon-initialize'.*"
         (swap (ring-ref symon--swap-status 0))
         (cpu (ring-ref symon--cpu-status 0))
         (battery (ring-ref symon--battery-status 0))
-        (message-log-max nil))
+        (message-log-max nil))    ; do not insert to *Messages* buffer
     (message
      (concat "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
              (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
@@ -187,7 +187,7 @@ informations."
 
 (defun symon-default-windows-fetcher ()
   "symon fetcher for Windows systems. use `typeperf' for cpu,
-`w32-memory-info' for physical memory, `wmic' for page file,
+`w32-memory-info' for physical memory, `wmic' for page file, and
 `w32-battery-status' for battery informations."
   (set-process-query-on-exit-flag
    (start-process-shell-command
