@@ -175,7 +175,7 @@ informations."
     (setq mem  (cdr (split-string mem))
           swap (cdr (split-string swap)))
     (ring-insert symon--memory-status (/ (* (read (cadr mem)) 100) (read (car mem))))
-    (ring-insert symon--swap-status   (/ (read (cadr mem)) 1000)))
+    (ring-insert symon--swap-status   (read (cadr swap))))
   ;; Battery
   (ring-insert symon--battery-status
                (when battery-status-function
