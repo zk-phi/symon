@@ -161,24 +161,27 @@ informations."
 (defvar symon--default-linux/last-cpu-ticks '(0 . 0))
 (defun symon--default-linux/update-statuses ()
   ;; CPU
-  (when (file-exists-p "/proc/stat")
-    (let* ((str (shell-command-to-string "cat /proc/stat"))
-           (_ (string-match "^cpu\\_>\\(.*\\)$" str))
-           (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
-           (total (apply '+ lst))
-           (idle (nth 3 lst))
-           (total-diff (- total (car symon--default-linux/last-cpu-ticks)))
-           (idle-diff (- idle (cdr symon--default-linux/last-cpu-ticks))))
-      (setq symon--default-linux/last-cpu-ticks (cons total idle))
-      (ring-insert symon--cpu-status (/ (* (- total-diff idle-diff) 100) total-diff))))
+  (if (file-exists-p "/proc/stat")
+      (let* ((str (shell-command-to-string "cat /proc/stat"))
+             (_ (string-match "^cpu\\_>\\(.*\\)$" str))
+             (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
+             (total (apply '+ lst))
+             (idle (nth 3 lst))
+             (total-diff (- total (car symon--default-linux/last-cpu-ticks)))
+             (idle-diff (- idle (cdr symon--default-linux/last-cpu-ticks))))
+        (setq symon--default-linux/last-cpu-ticks (cons total idle))
+        (ring-insert symon--cpu-status (/ (* (- total-diff idle-diff) 100) total-diff)))
+    (ring-insert symon--cpu-status nil))
   ;; Memory / Swap
-  (when (executable-find "free")
-    (cl-destructuring-bind (_ mem swap . __)
-        (split-string (shell-command-to-string "free -o -m") "\n")
-      (setq mem  (cdr (split-string mem))
-            swap (cdr (split-string swap)))
-      (ring-insert symon--memory-status (/ (* (read (cadr mem)) 100) (read (car mem))))
-      (ring-insert symon--swap-status   (read (cadr swap)))))
+  (if (executable-find "free")
+      (cl-destructuring-bind (_ mem swap . __)
+          (split-string (shell-command-to-string "free -o -m") "\n")
+        (setq mem  (cdr (split-string mem))
+              swap (cdr (split-string swap)))
+        (ring-insert symon--memory-status (/ (* (read (cadr mem)) 100) (read (car mem))))
+        (ring-insert symon--swap-status   (read (cadr swap))))
+    (ring-insert symon--memory-status nil)
+    (ring-insert symon--swap-status nil))
   ;; Battery
   (ring-insert symon--battery-status
                (when battery-status-function
@@ -201,18 +204,22 @@ informations."
   ;; CPU
   (with-current-buffer " *symon-typeperf*"
     (save-excursion
-      (when (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
-        (ring-insert symon--cpu-status (round (read (match-string 1)))))))
+      (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+          (progn
+            (ring-insert symon--cpu-status (round (read (match-string 1))))
+            (delete-region (point-min) (point)))
+        (ring-insert symon--cpu-status nil))))
   ;; Memory
   (let* ((info (cadr (w32-memory-info)))
          (total (cadr info))
          (free (cl-caddr info)))
     (ring-insert symon--memory-status (round (/ (* (- total free) 100) total))))
   ;; Swap (is this correct ?)
-  (when (executable-find "wmic")
-    (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
-      (string-match "^[0-9]+\\>" str)
-      (ring-insert symon--swap-status (read (match-string 0 str)))))
+  (if (executable-find "wmic")
+      (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
+        (string-match "^[0-9]+\\>" str)
+        (ring-insert symon--swap-status (read (match-string 0 str))))
+    (ring-insert symon--swap-status nil))
   ;; Battery
   (ring-insert symon--battery-status (read (cdr (assoc ?p (w32-battery-status))))))
 
