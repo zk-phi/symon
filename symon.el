@@ -68,7 +68,7 @@ BEFORE calling `symon-initialize'.*"
     ((gnu/linux cygwin) 'symon-default-linux-fetcher)
     ((ms-dos windows-nt) 'symon-default-windows-fetcher))
   "fetcher function to read system statuses. you can use
-  preconfigured monitors `symon-default-linux-fetcher' or
+  preconfigured fetcher `symon-default-linux-fetcher' or
   `symon-default-windows-fetcher', or implement your own. *set
   this option BEFORE calling `symon-initialize'.*"
   :group 'symon)
