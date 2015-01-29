@@ -1,20 +1,80 @@
+;;; symon.el --- tiny graphical system monitor
+
+;; Copyright (C) 2015 zk_phi
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 2 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program; if not, write to the Free Software
+;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+;; Author: zk_phi
+;; URL: http://hins11.yu-yake.com/
+;; Version: 1.0.0beta
+
+;;; Commentary:
+
+;; Load this script
+;;
+;;   (require 'symon)
+;;
+;; and initialize.
+;;
+;;   (symon-initialize)
+;;
+;; then a tiny system monitor is displayed in minibuffer during idle.
+
+;;; Change Log:
+
+;;; Code:
+
 (require 'ring)
 (require 'cl-lib)
 (require 'battery)
 
-;; ---- options
+(defconst symon-version "1.0.0beta")
 
-;; set these variables BEFORE calling `symon-initialize'
+(defgroup symon nil
+  "tiny graphical system monitor"
+  :group 'emacs)
 
-(defvar symon-history-size 100)
-(defvar symon-refresh-rate 3)
-(defvar symon-delay 2)
-(defvar symon-sparkline-size '(80 . 11))
+;; + customs
 
-(defvar symon-monitor
+(defcustom symon-history-size 100
+  "number of old values to keep. sparklines grow faster when set
+smaller. *set up this option BEFORE calling `symon-initialize'.*"
+  :group 'symon)
+
+(defcustom symon-refresh-rate 3
+  "refresh rate of status values in seconds. *set up this option
+  BEFORE calling `symon-initialize'.*"
+  :group 'symon)
+
+(defcustom symon-delay 2
+  "delay in seconds until symon is displayed. *set up this option
+BEFORE calling `symon-initialize'.*"
+  :group 'symon)
+
+(defcustom symon-sparkline-size '(80 . 11)
+  "(WIDTH . HEIGHT) of sparkline."
+  :group 'symon)
+
+(defcustom symon-monitor
   (cl-case system-type
     ((gnu/linux cygwin) 'symon-default-linux-monitor)
-    ((ms-dos windows-nt) 'symon-default-windows-monitor)))
+    ((ms-dos windows-nt) 'symon-default-windows-monitor))
+  "monitor function to read system statuses. you can use
+  preconfigured monitors `symon-default-linux-monitor' or
+  `symon-default-windows-monitor', or implement your own."
+  :group 'symon)
 
 ;; ---- symon core
 
@@ -141,3 +201,5 @@
 ;; ---- provide
 
 (provide 'symon)
+
+;;; symon.el ends here
