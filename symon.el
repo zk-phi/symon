@@ -63,13 +63,13 @@ smaller. *set this option BEFORE calling `symon-initialize'.*"
 BEFORE calling `symon-initialize'.*"
   :group 'symon)
 
-(defcustom symon-monitor
+(defcustom symon-fetcher
   (cl-case system-type
-    ((gnu/linux cygwin) 'symon-default-linux-monitor)
-    ((ms-dos windows-nt) 'symon-default-windows-monitor))
-  "monitor function to read system statuses. you can use
-  preconfigured monitors `symon-default-linux-monitor' or
-  `symon-default-windows-monitor', or implement your own. *set
+    ((gnu/linux cygwin) 'symon-default-linux-fetcher)
+    ((ms-dos windows-nt) 'symon-default-windows-fetcher))
+  "fetcher function to read system statuses. you can use
+  preconfigured monitors `symon-default-linux-fetcher' or
+  `symon-default-windows-fetcher', or implement your own. *set
   this option BEFORE calling `symon-initialize'.*"
   :group 'symon)
 
@@ -98,7 +98,7 @@ BEFORE calling `symon-initialize'.*"
                  symon--cpu-status
                  symon--battery-status))
     (set var (symon--make-ring symon-history-size nil)))
-  (funcall symon-monitor)
+  (funcall symon-fetcher)
   (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
   (run-with-idle-timer symon-delay t 'symon-display)
   (add-hook 'pre-command-hook 'symon-display-end))
@@ -147,10 +147,10 @@ BEFORE calling `symon-initialize'.*"
   "deactivate symon display."
   (setq symon-active nil))
 
-;; + default linux monitor
+;; + default linux fetcher
 
-(defun symon-default-linux-monitor ()
-  "symon monitor for Linux systems. use `/proc/stat' for cpu,
+(defun symon-default-linux-fetcher ()
+  "symon fetcher for Linux systems. use `/proc/stat' for cpu,
 `free' for memory, and `battery-status-function' for battery
 informations."
   (run-with-timer 0 symon-refresh-rate 'symon--default-linux/update-statuses))
@@ -179,10 +179,10 @@ informations."
                (when battery-status-function
                  (read (cdr (assoc ?p (funcall battery-status-function)))))))
 
-;; + default windows monitor
+;; + default windows fetcher
 
-(defun symon-default-windows-monitor ()
-  "symon monitor for Windows systems. use `typeperrf' for cpu,
+(defun symon-default-windows-fetcher ()
+  "symon fetcher for Windows systems. use `typeperrf' for cpu,
 `w32-memory-info' for physical memory, `wmic' for page file,
 `w32-battery-status' for battery informations."
   (set-process-query-on-exit-flag
