@@ -23,24 +23,26 @@ then a tiny system monitor is displayed in minibuffer during idle.
 ** Supported Systems
 
 - Linux
-  - cpu :: =/proc/stat=
-  - memory :: =free -o -m=
-  - battery :: one of =/proc/apm=, =/proc/acpi/battery=,
-               =/sys/class/power_supply=
-
 - Windows (XP or later)
-  - cpu :: =typeperf "\Processor(_Total)\% Processor Time"​=
-  - memory (physical) :: =(w32-memory-info)=
-  - memory (virtual) :: =wmic path Win32_PageFileUsage get CurrentUsage=
-  - battery :: =(w32-battery-status)=
 
 other systems are unsupported for now (contributions are welcome!).
 
 ** Provided Informations
 
 - memory usage (%)
+  - Linux : =free -o -m=
+  - Windows : =(w32-memory-info)=
+
 - swapped memory (MB)
+  - Linux : =free -o -m=
+  - Windows : =wmic path Win32_PageFileUsage get CurrentUsage=
+
 - CPU usage (%)
+  - Linux : =/proc/stat=
+  - Windows : =typeperf "\Processor(_Total)\% Processor Time"​=
+
 - remaining battery (%)
+  - Linux : one of =/proc/apm=, =/proc/acpi/battery=, =/sys/class/power_supply=
+  - Windows : =(w32-battery-status)=
 
 network informations are probably added someday.
