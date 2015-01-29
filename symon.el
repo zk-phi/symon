@@ -89,6 +89,11 @@ BEFORE calling `symon-initialize'.*"
   "like `make-ring' but INIT can be specified."
   (cons 0 (cons size (make-vector size init))))
 
+(defun symon-stop ()
+  (interactive)
+  "stop symon system monitor"
+  (cancel-function-timers 'symon-display))
+
 (defun symon-initialize ()
   "setup symon system monitor."
   (interactive)
