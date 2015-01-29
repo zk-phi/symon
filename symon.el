@@ -211,7 +211,7 @@ informations."
   ;; Battery
   (ring-insert symon--battery-status (read (cdr (assoc ?p (w32-battery-status))))))
 
-;; ---- provide
+;; + provide
 
 (provide 'symon)
 

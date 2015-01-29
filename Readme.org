@@ -1,0 +1,37 @@
+* symon.el
+
+コンパクトでおしゃれなシステムモニター
+
+tiny graphical system monitor
+
+** Screencast
+
+[[img/screenshot.png]]
+
+** Usage
+
+Load this script
+
+: (require 'symon)
+
+and initialize.
+
+: (symon-initialize)
+
+then a tiny system monitor is displayed in minibuffer during idle.
+
+** Supported Systems
+
+- Linux
+- Windows
+
+Mac is unsupported for now (contributions are welcome!).
+
+** Supported Informations
+
+- memory usage (%)
+- swapped memory (MB)
+- CPU usage (%)
+- remaining battery (%)
+
+network informations are probably added someday.
