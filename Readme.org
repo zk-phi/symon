@@ -23,7 +23,16 @@ then a tiny system monitor is displayed in minibuffer during idle.
 ** Supported Systems
 
 - Linux
+  - cpu :: =/proc/stat=
+  - memory :: =free -o -m=
+  - battery :: one of =/proc/apm=, =/proc/acpi/battery=,
+               =/sys/class/power_supply=
+
 - Windows (XP or later)
+  - cpu :: =typeperf "\Processor(_Total)\% Processor Time"​=
+  - physical memory :: =(w32-memory-info)=
+  - swap :: =wmic path Win32_PageFileUsage get CurrentUsage=
+  - battery :: =(w32-battery-status)=
 
 other systems are unsupported for now (contributions are welcome!).
 
