@@ -50,21 +50,17 @@
 
 (defcustom symon-history-size 100
   "number of old values to keep. sparklines grow faster when set
-smaller. *set up this option BEFORE calling `symon-initialize'.*"
+smaller. *set this option BEFORE calling `symon-initialize'.*"
   :group 'symon)
 
 (defcustom symon-refresh-rate 3
-  "refresh rate of status values in seconds. *set up this option
+  "refresh rate of status values in seconds. *set this option
   BEFORE calling `symon-initialize'.*"
   :group 'symon)
 
 (defcustom symon-delay 2
-  "delay in seconds until symon is displayed. *set up this option
+  "delay in seconds until symon is displayed. *set this option
 BEFORE calling `symon-initialize'.*"
-  :group 'symon)
-
-(defcustom symon-sparkline-size '(80 . 11)
-  "(WIDTH . HEIGHT) of sparkline."
   :group 'symon)
 
 (defcustom symon-monitor
@@ -73,21 +69,29 @@ BEFORE calling `symon-initialize'.*"
     ((ms-dos windows-nt) 'symon-default-windows-monitor))
   "monitor function to read system statuses. you can use
   preconfigured monitors `symon-default-linux-monitor' or
-  `symon-default-windows-monitor', or implement your own."
+  `symon-default-windows-monitor', or implement your own. *set
+  this option BEFORE calling `symon-initialize'.*"
   :group 'symon)
 
-;; ---- symon core
+(defcustom symon-sparkline-size '(80 . 11)
+  "(WIDTH . HEIGHT) of sparkline."
+  :group 'symon)
+
+;; + symon core
 
 (defvar symon--memory-status nil)
 (defvar symon--swap-status nil)
 (defvar symon--cpu-status nil)
 (defvar symon--battery-status nil)
-(defvar symon--displaying nil)
+
+(defvar symon-active nil)
 
 (defun symon--make-ring (size init)
+  "like `make-ring' but INIT can be specified."
   (cons 0 (cons size (make-vector size init))))
 
 (defun symon-initialize ()
+  "setup symon system monitor."
   (interactive)
   (dolist (var '(symon--memory-status
                  symon--swap-status
@@ -100,6 +104,7 @@ BEFORE calling `symon-initialize'.*"
   (add-hook 'pre-command-hook 'symon-display-end))
 
 (defun symon--make-sparkline (ring)
+  "make sparkline image from RING."
   (let ((image-data
          (make-bool-vector (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
         (num-samples (ring-size ring))
@@ -117,6 +122,7 @@ BEFORE calling `symon-initialize'.*"
       `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100))))
 
 (defun symon-display ()
+  "activate symon display."
   (interactive)
   (let ((memory (ring-ref symon--memory-status 0))
         (swap (ring-ref symon--swap-status 0))
@@ -131,18 +137,25 @@ BEFORE calling `symon-initialize'.*"
              (propertize " " 'display (symon--make-sparkline symon--cpu-status)) " "
              "BAT:" (if (integerp battery) (number-to-string battery) "N/A") "%% "
              (propertize " " 'display (symon--make-sparkline symon--battery-status)))))
-  (setq symon--displaying t))
+  (setq symon-active t))
 
 (defun symon--redisplay ()
-  (when symon--displaying (symon-display)))
+  "update symon display."
+  (when symon-active (symon-display)))
 
 (defun symon-display-end ()
-  (setq symon--displaying nil))
+  "deactivate symon display."
+  (setq symon-active nil))
 
-;; ---- default linux monitor
+;; + default linux monitor
+
+(defun symon-default-linux-monitor ()
+  "symon monitor for Linux systems. use `/proc/stat' for cpu,
+`free' for memory, and `battery-status-function' for battery
+informations."
+  (run-with-timer 0 symon-refresh-rate 'symon--default-linux/update-statuses))
 
 (defvar symon--default-linux/last-cpu-ticks '(0 . 0))
-
 (defun symon--default-linux/update-statuses ()
   ;; CPU
   (let* ((str (shell-command-to-string "cat /proc/stat"))
@@ -165,12 +178,12 @@ BEFORE calling `symon-initialize'.*"
   (ring-insert symon--battery-status
                (read (cdr (assoc ?p (funcall battery-status-function))))))
 
-(defun symon-default-linux-monitor ()
-  (run-with-timer 0 symon-refresh-rate 'symon--default-linux/update-statuses))
-
-;; ---- default windows monitor
+;; + default windows monitor
 
 (defun symon-default-windows-monitor ()
+  "symon monitor for Windows systems. use `typeperrf' for cpu,
+`w32-memory-info' for physical memory, `wmic' for page file,
+`w32-battery-status' for battery informations."
   (set-process-query-on-exit-flag
    (start-process-shell-command
     "symon-typeperf" " *symon-typeperf*"
