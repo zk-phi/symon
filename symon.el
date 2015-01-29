@@ -93,6 +93,8 @@ BEFORE calling `symon-initialize'.*"
 (defun symon-initialize ()
   "setup symon system monitor."
   (interactive)
+  (unless symon-fetcher
+    (error "`symon-fetcher' is not set."))
   (dolist (var '(symon--memory-status
                  symon--swap-status
                  symon--cpu-status
