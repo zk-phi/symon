@@ -46,3 +46,11 @@ other systems are unsupported for now (contributions are welcome!).
   - Windows : =(w32-battery-status)=
 
 network informations are probably added someday.
+
+** NOTE
+
+This is still a beta project.
+
+May have some bugs, and APIs are voratile.
+
+Contributions are welcome!
