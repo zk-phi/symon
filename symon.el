@@ -176,7 +176,8 @@ informations."
     (ring-insert symon--swap-status   (/ (read (cadr mem)) 1000)))
   ;; Battery
   (ring-insert symon--battery-status
-               (read (cdr (assoc ?p (funcall battery-status-function))))))
+               (when battery-status-function
+                 (read (cdr (assoc ?p (funcall battery-status-function)))))))
 
 ;; + default windows monitor
 
