@@ -128,14 +128,15 @@ BEFORE calling `symon-initialize'.*"
         (cpu (ring-ref symon--cpu-status 0))
         (battery (ring-ref symon--battery-status 0))
         (message-log-max nil))    ; do not insert to *Messages* buffer
-    (message
-     (concat "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
-             (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
-             (propertize " " 'display (symon--make-sparkline symon--memory-status)) " "
-             "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
-             (propertize " " 'display (symon--make-sparkline symon--cpu-status)) " "
-             "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
-             (propertize " " 'display (symon--make-sparkline symon--battery-status)))))
+    (if (not (active-minibuffer-window))
+        (message
+         (concat "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
+                 (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
+                 (propertize " " 'display (symon--make-sparkline symon--memory-status)) " "
+                 "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
+                 (propertize " " 'display (symon--make-sparkline symon--cpu-status)) " "
+                 "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
+                 (propertize " " 'display (symon--make-sparkline symon--battery-status))))))
   (setq symon--active t))
 
 (defun symon--redisplay ()
