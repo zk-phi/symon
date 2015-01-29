@@ -77,7 +77,6 @@
   (when symon--displaying (symon-display)))
 
 (defun symon-display-end ()
-  (interactive)
   (setq symon--displaying nil))
 
 ;; ---- default linux monitor
