@@ -132,12 +132,16 @@ BEFORE calling `symon-initialize'.*"
         (battery (ring-ref symon--battery-status 0))
         (message-log-max nil))
     (message
-     (concat "MEM:" (if (integerp memory) (number-to-string memory) "N/A") "%% "
-             "(" (if (integerp swap) (number-to-string swap) "N/A") "MB Swapped) "
+     (concat "MEM:" (if (not (integerp memory)) "N/A "
+                      (concat (number-to-string memory) "%% "
+                              (when (and (integerp swap) (> swap 0))
+                                (concat "(" (number-to-string swap) "MB Swapped) "))))
              (propertize " " 'display (symon--make-sparkline symon--memory-status)) " "
-             "CPU:" (if (integerp cpu) (number-to-string cpu) "N/A") "%% "
+             "CPU:" (if (not (integerp cpu)) "N/A "
+                      (concat (number-to-string cpu) "%% "))
              (propertize " " 'display (symon--make-sparkline symon--cpu-status)) " "
-             "BAT:" (if (integerp battery) (number-to-string battery) "N/A") "%% "
+             "BAT:" (if (not (integerp battery)) "N/A "
+                      (concat (number-to-string battery) "%% "))
              (propertize " " 'display (symon--make-sparkline symon--battery-status)))))
   (setq symon-active t))
 
