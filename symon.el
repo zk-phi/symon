@@ -95,10 +95,8 @@ BEFORE calling `symon-initialize'.*"
   (interactive)
   (unless symon-fetcher
     (error "`symon-fetcher' is not set."))
-  (dolist (var '(symon--memory-status
-                 symon--swap-status
-                 symon--cpu-status
-                 symon--battery-status))
+  (dolist (var '(symon--memory-status symon--swap-status
+                                      symon--cpu-status symon--battery-status))
     (set var (symon--make-ring symon-history-size nil)))
   (funcall symon-fetcher)
   (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
@@ -188,7 +186,7 @@ informations."
 ;; + default windows fetcher
 
 (defun symon-default-windows-fetcher ()
-  "symon fetcher for Windows systems. use `typeperrf' for cpu,
+  "symon fetcher for Windows systems. use `typeperf' for cpu,
 `w32-memory-info' for physical memory, `wmic' for page file,
 `w32-battery-status' for battery informations."
   (set-process-query-on-exit-flag
