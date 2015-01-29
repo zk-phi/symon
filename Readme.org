@@ -23,11 +23,11 @@ then a tiny system monitor is displayed in minibuffer during idle.
 ** Supported Systems
 
 - Linux
-- Windows
+- Windows (XP or later)
 
-Mac is unsupported for now (contributions are welcome!).
+other systems are unsupported for now (contributions are welcome!).
 
-** Supported Informations
+** Provided Informations
 
 - memory usage (%)
 - swapped memory (MB)
