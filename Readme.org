@@ -51,6 +51,6 @@ network informations are probably added someday.
 
 This is still a beta project.
 
-May have some bugs, and APIs are voratile.
+May have some bugs, and APIs are volatile.
 
 Contributions are welcome!
