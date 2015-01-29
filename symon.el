@@ -84,7 +84,7 @@ BEFORE calling `symon-initialize'.*"
 (defvar symon--cpu-status nil)
 (defvar symon--battery-status nil)
 
-(defvar symon-active nil)
+(defvar symon--active nil)
 
 (defun symon--make-ring (size init)
   "like `make-ring' but INIT can be specified."
@@ -143,15 +143,15 @@ BEFORE calling `symon-initialize'.*"
              "BAT:" (if (not (integerp battery)) "N/A "
                       (concat (number-to-string battery) "%% "))
              (propertize " " 'display (symon--make-sparkline symon--battery-status)))))
-  (setq symon-active t))
+  (setq symon--active t))
 
 (defun symon--redisplay ()
   "update symon display."
-  (when symon-active (symon-display)))
+  (when symon--active (symon-display)))
 
 (defun symon-display-end ()
   "deactivate symon display."
-  (setq symon-active nil))
+  (setq symon--active nil))
 
 ;; + default linux fetcher
 
