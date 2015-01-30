@@ -84,7 +84,7 @@ BEFORE calling `symon-initialize'.*"
 ;; each FN is a function which takes no arguments. SETUP-FN is called
 ;; on activation, and CLEANUP-FN is called on deactivation of
 ;; symon-mode. UPDATE-FN is called every `symon-refresh-rate' seconds
-;; and expected to report system status via `symon-update-status'.
+;; and expected to report system status via `symon-commit-status'.
 
 (defvar symon--memory-status nil)
 (defvar symon--swap-status nil)
@@ -97,7 +97,7 @@ BEFORE calling `symon-initialize'.*"
                 (lambda () ,(plist-get plist :cleanup))
                 (lambda () ,(plist-get plist :update)))))
 
-(defun symon-update-status (status value)
+(defun symon-commit-status (status value)
   (ring-insert (cl-case status
                  ((memory)  symon--memory-status)
                  ((swap)    symon--swap-status)
@@ -135,7 +135,7 @@ BEFORE calling `symon-initialize'.*"
                  symon--status-update-function (aref vec 2)))
          (setq symon--timer-objects
                (list (run-with-timer 0 symon-refresh-rate 'symon--update)
-                     (run-with-idle-timer symon-delay t 'symon-display)))
+                     (run-with-idle-timer symon-delay t 'symon--display)))
          (add-hook 'pre-command-hook 'symon-display-end))
         (t
          (remove-hook 'pre-command-hook 'symon-display-end)
@@ -160,7 +160,7 @@ BEFORE calling `symon-initialize'.*"
           (aset image-data (+ (* (- height y 1) width) x) t)))
       `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100))))
 
-(defun symon-display ()
+(defun symon--display ()
   "activate symon display."
   (interactive)
   (when (not (active-minibuffer-window))
@@ -183,7 +183,7 @@ BEFORE calling `symon-initialize'.*"
 (defun symon--update ()
   "update symon display."
   (funcall symon--status-update-function)
-  (when symon--display-active (symon-display)))
+  (when symon--display-active (symon--display)))
 
 (defun symon-display-end ()
   "deactivate symon display."
@@ -207,23 +207,23 @@ BEFORE calling `symon-initialize'.*"
                   (save-excursion
                     (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
                         (progn
-                          (symon-update-status 'cpu (round (read (match-string 1))))
+                          (symon-commit-status 'cpu (round (read (match-string 1))))
                           (delete-region (point-min) (point)))
-                      (symon-update-status 'cpu nil))))
-              (symon-update-status 'cpu nil))
+                      (symon-commit-status 'cpu nil))))
+              (symon-commit-status 'cpu nil))
             ;; Memory
             (let* ((info (cadr (w32-memory-info)))
                    (total (cadr info))
                    (free (cl-caddr info)))
-              (symon-update-status 'memory (round (/ (* (- total free) 100) total))))
+              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
             ;; Swap (is this correct ?)
             (if (executable-find "wmic")
                 (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
                   (string-match "^[0-9]+\\>" str)
-                  (symon-update-status 'swap (read (match-string 0 str))))
-              (symon-update-status 'swap nil))
+                  (symon-commit-status 'swap (read (match-string 0 str))))
+              (symon-commit-status 'swap nil))
             ;; Battery
-            (symon-update-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
+            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
 
 ;; + linux fetcher
 
@@ -242,20 +242,20 @@ BEFORE calling `symon-initialize'.*"
                        (total-diff (- total (car symon-default-linux-fetcher--last-cpu-ticks)))
                        (idle-diff (- idle (cdr symon-default-linux-fetcher--last-cpu-ticks))))
                   (setq symon-default-linux-fetcher--last-cpu-ticks (cons total idle))
-                  (symon-update-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
-              (symon-update-status 'cpu nil))
+                  (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
+              (symon-commit-status 'cpu nil))
             ;; Memory / Swap
             (if (executable-find "free")
                 (cl-destructuring-bind (_ mem swap . __)
                     (split-string (shell-command-to-string "free -o -m") "\n")
                   (setq mem  (cdr (split-string mem))
                         swap (cdr (split-string swap)))
-                  (symon-update-status 'memory (/ (* (read (cadr mem)) 100) (read (car mem))))
-                  (symon-update-status 'swap   (read (cadr swap))))
-              (symon-update-status 'memory nil)
-              (symon-update-status 'swap   nil))
+                  (symon-commit-status 'memory (/ (* (read (cadr mem)) 100) (read (car mem))))
+                  (symon-commit-status 'swap   (read (cadr swap))))
+              (symon-commit-status 'memory nil)
+              (symon-commit-status 'swap   nil))
             ;; Battery
-            (symon-update-status 'battery
+            (symon-commit-status 'battery
                                  (when battery-status-function
                                    (read (cdr (assoc ?p (funcall battery-status-function))))))))
 
