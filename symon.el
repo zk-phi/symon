@@ -169,9 +169,7 @@ BEFORE enabling `symon-mode'.*"
                       (symon-commit-status 'cpu nil))))
               (symon-commit-status 'cpu nil))
             ;; Memory
-            (let* ((info (cadr (w32-memory-info)))
-                   (total (cadr info))
-                   (free (cl-caddr info)))
+            (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
               (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
             ;; Swap (is this correct ?)
             (if (executable-find "wmic")
