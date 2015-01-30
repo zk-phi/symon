@@ -138,9 +138,8 @@ BEFORE enabling `symon-mode'.*"
             (if (executable-find "free")
                 (let* ((str (shell-command-to-string "free -m")))
                   (string-match "^Mem:[\s\t]*\\([0-9]+\\)[\s\t]*\\([0-9]+\\)\\>" str)
-                  (symon-commit-status
-                   'memory
-                   (/ (* (read (match-string 2 str)) 100) (read (match-string 1 str))))
+                  (symon-commit-status 'memory (/ (* (read (match-string 2 str)) 100)
+                                                  (read (match-string 1 str))))
                   (string-match "^Swap:[\s\t]*[0-9]+[\s\t]*\\([0-9]+\\)\\>" str)
                   (symon-commit-status 'swap (read (match-string 1 str))))
               (symon-commit-status 'memory nil)
@@ -210,22 +209,24 @@ BEFORE enabling `symon-mode'.*"
          (mapc 'cancel-timer symon--timer-objects)
          (funcall symon--cleanup-function))))
 
-(defun symon--make-sparkline (list &optional upper-bound)
+(defun symon--make-sparkline (list &optional lim)
   "make sparkline image from LIST."
   (let ((image-data
-         (make-bool-vector (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
+         (make-bool-vector
+          (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
+        (lim (if lim (float lim) 100.0))
         (num-samples (length list))
         (samples (apply 'vector list))
         (width (car symon-sparkline-size))
         (height (cdr symon-sparkline-size)))
     (unless (zerop num-samples)
-      (let ((height-per-point (/ height (if upper-bound (float upper-bound) 100.0)))
+      (let ((height-per-point (/ height (1+ lim)))
             (width-per-sample (/ width (float num-samples)))
             sample y)
         (dotimes (x width)
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
-            (setq y (floor (* (if (= sample 100) 99 sample) height-per-point)))
+            (setq y (floor (* sample height-per-point)))
             (when (< y height)
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
