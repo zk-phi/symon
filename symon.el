@@ -94,6 +94,7 @@ BEFORE calling `symon-initialize'.*"
   "stop symon system monitor"
   (cancel-function-timers 'symon-display))
 
+;;;###autoload
 (defun symon-initialize ()
   "setup symon system monitor."
   (interactive)
