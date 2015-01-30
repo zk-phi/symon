@@ -34,11 +34,11 @@ other systems are unsupported for now (contributions are welcome!).
 ** Provided Informations
 
 - memory usage (%)
-  - Linux : =free -o -m=
+  - Linux : =free -m=
   - Windows : =(w32-memory-info)=
 
 - swapped memory (MB)
-  - Linux : =free -o -m=
+  - Linux : =free -m=
   - Windows : =wmic path Win32_PageFileUsage get CurrentUsage=
 
 - CPU usage (%)

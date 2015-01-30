@@ -173,7 +173,8 @@ BEFORE enabling `symon-mode'.*"
               (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
             ;; Swap (is this correct ?)
             (if (executable-find "wmic")
-                (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
+                (let ((str (shell-command-to-string
+                            "wmic path Win32_PageFileUsage get CurrentUsage")))
                   (string-match "^[0-9]+\\>" str)
                   (symon-commit-status 'swap (read (match-string 0 str))))
               (symon-commit-status 'swap nil))
