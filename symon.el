@@ -79,6 +79,33 @@ BEFORE enabling `symon-mode'.*"
   "(WIDTH . HEIGHT) of sparkline."
   :group 'symon)
 
+;; + utilities
+
+(defun symon--file-contents (file)
+  (with-temp-buffer (insert-file-contents file) (buffer-string)))
+
+(defun symon--make-sparkline (list &optional lim)
+  "make sparkline image from LIST."
+  (let ((image-data
+         (make-bool-vector
+          (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
+        (lim (if lim (float lim) 100.0))
+        (num-samples (length list))
+        (samples (apply 'vector list))
+        (width (car symon-sparkline-size))
+        (height (cdr symon-sparkline-size)))
+    (unless (zerop num-samples)
+      (let ((height-per-point (/ height (1+ lim)))
+            (width-per-sample (/ width (float num-samples)))
+            sample y)
+        (dotimes (x width)
+          (setq sample (aref samples (floor (/ x width-per-sample))))
+          (when (numberp sample)
+            (setq y (floor (* sample height-per-point)))
+            (when (< y height)
+              (aset image-data (+ (* (- height y 1) width) x) t))))))
+    `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
+
 ;; + status rings
 
 ;; system statuses are stored in `symon--statuses', as a list of
@@ -117,38 +144,6 @@ BEFORE enabling `symon-mode'.*"
                 (lambda () ,(plist-get plist :cleanup))
                 (lambda () ,(plist-get plist :update)))))
 
-;; linux fetcher
-(defvar symon-default-linux-fetcher--last-cpu-ticks nil)
-(define-symon-fetcher symon-default-linux-fetcher
-  :setup (setq symon-default-linux-fetcher--last-cpu-ticks '(0 . 0))
-  :update (progn
-            ;; CPU
-            (if (file-exists-p "/proc/stat")
-                (let* ((str (shell-command-to-string "cat /proc/stat"))
-                       (_ (string-match "^cpu\\_>\\(.*\\)$" str))
-                       (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
-                       (total (apply '+ lst))
-                       (idle (nth 3 lst))
-                       (total-diff (- total (car symon-default-linux-fetcher--last-cpu-ticks)))
-                       (idle-diff (- idle (cdr symon-default-linux-fetcher--last-cpu-ticks))))
-                  (setq symon-default-linux-fetcher--last-cpu-ticks (cons total idle))
-                  (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
-              (symon-commit-status 'cpu nil))
-            ;; Memory / Swap
-            (if (executable-find "free")
-                (let* ((str (shell-command-to-string "free -m")))
-                  (string-match "^Mem:[\s\t]*\\([0-9]+\\)[\s\t]*\\([0-9]+\\)\\>" str)
-                  (symon-commit-status 'memory (/ (* (read (match-string 2 str)) 100)
-                                                  (read (match-string 1 str))))
-                  (string-match "^Swap:[\s\t]*[0-9]+[\s\t]*\\([0-9]+\\)\\>" str)
-                  (symon-commit-status 'swap (read (match-string 1 str))))
-              (symon-commit-status 'memory nil)
-              (symon-commit-status 'swap   nil))
-            ;; Battery
-            (symon-commit-status 'battery
-                                 (when battery-status-function
-                                   (read (cdr (assoc ?p (funcall battery-status-function))))))))
-
 ;; windows fetcher
 (define-symon-fetcher symon-default-windows-fetcher
   :setup (set-process-query-on-exit-flag
@@ -181,6 +176,43 @@ BEFORE enabling `symon-mode'.*"
             ;; Battery
             (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
 
+;; linux fetcher
+(defvar symon--last-cpu-ticks nil)
+(define-symon-fetcher symon-default-linux-fetcher
+  :setup (setq symon--last-cpu-ticks '(0 . 0))
+  :update (progn
+            ;; CPU
+            (if (file-exists-p "/proc/stat")
+                (let* ((str (symon--file-contents "/proc/stat"))
+                       (_ (string-match "^cpu\\_>\\(.*\\)$" str))
+                       (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
+                       (total (apply '+ lst))
+                       (idle (nth 3 lst))
+                       (total-diff (- total (car symon--last-cpu-ticks)))
+                       (idle-diff (- idle (cdr symon--last-cpu-ticks))))
+                  (setq symon--last-cpu-ticks (cons total idle))
+                  (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
+              (symon-commit-status 'cpu nil))
+            ;; Memory / Swap
+            (if (file-exists-p "/proc/meminfo")
+                (let* ((str (symon--file-contents "/proc/meminfo"))
+                       (_ (string-match "^MemTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+                       (memtotal (read (match-string 1 str)))
+                       (_ (string-match "^MemFree:[\s\t]*\\([0-9]+\\)\\>" str))
+                       (memfree (read (match-string 1 str)))
+                       (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+                       (swaptotal (read (match-string 1 str)))
+                       (_ (string-match "^SwapFree:[\s\t]*\\([0-9]+\\)\\>" str))
+                       (swapfree (read (match-string 1 str))))
+                  (symon-commit-status 'memory (/ (* (- memtotal memfree) 100) memtotal))
+                  (symon-commit-status 'swap (/ (- swaptotal swapfree) 1000)))
+              (symon-commit-status 'memory nil)
+              (symon-commit-status 'swap nil))
+            ;; Battery
+            (symon-commit-status 'battery
+                                 (when battery-status-function
+                                   (read (cdr (assoc ?p (funcall battery-status-function))))))))
+
 ;; + symon core
 
 (defvar symon--cleanup-function nil)
@@ -209,28 +241,6 @@ BEFORE enabling `symon-mode'.*"
          (remove-hook 'pre-command-hook 'symon-display-end)
          (mapc 'cancel-timer symon--timer-objects)
          (funcall symon--cleanup-function))))
-
-(defun symon--make-sparkline (list &optional lim)
-  "make sparkline image from LIST."
-  (let ((image-data
-         (make-bool-vector
-          (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
-        (lim (if lim (float lim) 100.0))
-        (num-samples (length list))
-        (samples (apply 'vector list))
-        (width (car symon-sparkline-size))
-        (height (cdr symon-sparkline-size)))
-    (unless (zerop num-samples)
-      (let ((height-per-point (/ height (1+ lim)))
-            (width-per-sample (/ width (float num-samples)))
-            sample y)
-        (dotimes (x width)
-          (setq sample (aref samples (floor (/ x width-per-sample))))
-          (when (numberp sample)
-            (setq y (floor (* sample height-per-point)))
-            (when (< y height)
-              (aset image-data (+ (* (- height y 1) width) x) t))))))
-    `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
 (defun symon--display ()
   "activate symon display."
