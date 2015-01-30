@@ -8,15 +8,19 @@ tiny graphical system monitor
 
 [[img/screenshot.png]]
 
+** *NOTE* RECENT VISIBLE CHANGES
+
+- =symon-initialize= is now obsolete (use =symon-mode= instead)
+
 ** Usage
 
 Load this script
 
 : (require 'symon)
 
-and initialize.
+and activate.
 
-: (symon-initialize)
+: (symon-mode)
 
 then a tiny system monitor is displayed in minibuffer during idle.
 
