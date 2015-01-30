@@ -136,12 +136,13 @@ BEFORE enabling `symon-mode'.*"
               (symon-commit-status 'cpu nil))
             ;; Memory / Swap
             (if (executable-find "free")
-                (cl-destructuring-bind (_ mem swap . __)
-                    (split-string (shell-command-to-string "free -o -m") "\n")
-                  (setq mem  (cdr (split-string mem))
-                        swap (cdr (split-string swap)))
-                  (symon-commit-status 'memory (/ (* (read (cadr mem)) 100) (read (car mem))))
-                  (symon-commit-status 'swap   (read (cadr swap))))
+                (let* ((str (shell-command-to-string "free -m")))
+                  (string-match "^Mem:[\s\t]*\\([0-9]+\\)[\s\t]*\\([0-9]+\\)\\>" str)
+                  (symon-commit-status
+                   'memory
+                   (/ (* (read (match-string 2 str)) 100) (read (match-string 1 str))))
+                  (string-match "^Swap:[\s\t]*[0-9]+[\s\t]*\\([0-9]+\\)\\>" str)
+                  (symon-commit-status 'swap (read (match-string 1 str))))
               (symon-commit-status 'memory nil)
               (symon-commit-status 'swap   nil))
             ;; Battery
