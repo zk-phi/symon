@@ -8,7 +8,7 @@ tiny graphical system monitor
 
 [[img/screenshot.png]]
 
-** *NOTE* RECENT VISIBLE CHANGES
+** NOTE: RECENT VISIBLE CHANGES
 
 - =symon-initialize= is now obsolete (use =symon-mode= instead)
 

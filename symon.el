@@ -68,8 +68,8 @@ BEFORE enabling `symon-mode'.*"
   (cl-case system-type
     ((windows-nt) 'symon-default-windows-fetcher)
     ((gnu/linux cygwin) 'symon-default-linux-fetcher))
-  "fetcher function to read system statuses. you can use
-  preconfigured fetcher `symon-default-linux-fetcher' or
+  "fetcher to read system statuses. you can use preconfigured
+  fetcher `symon-default-linux-fetcher' or
   `symon-default-windows-fetcher', or implement your own with
   `define-symon-fetcher'. *set this option BEFORE enabling
   `symon-mode'.*"
@@ -79,31 +79,43 @@ BEFORE enabling `symon-mode'.*"
   "(WIDTH . HEIGHT) of sparkline."
   :group 'symon)
 
+;; + status rings
+
+;; system statuses are stored in `symon--statuses', as a list of
+;; rings.
+
+(defvar symon--statuses nil)
+
+(defun symon--make-ring ()
+  "like `(make-ring symon-history-size)' but filled with `nil'."
+  (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
+
+(defun symon-commit-status (status value)
+  "push a status value VALUE for STATUS."
+  (let ((ring (cdr (assq status symon--statuses))))
+    (unless ring
+      (setq ring (symon--make-ring))
+      (push (cons status ring) symon--statuses))
+    (ring-insert ring value)))
+
+(defun symon--status-history (status)
+  "get a list of recent status values for STATUS."
+  (let ((ring (cdr (assq status symon--statuses))))
+    (when ring (ring-elements ring))))
+
 ;; + symon fetcher
 
 ;; a symon fetcher is a vector of [SETUP-FN CLEANUP-FN UPDATE-FN].
 ;; each FN is a function which takes no arguments. SETUP-FN is called
 ;; on activation, and CLEANUP-FN is called on deactivation of
 ;; symon-mode. UPDATE-FN is called every `symon-refresh-rate' seconds
-;; and expected to report system status via `symon-commit-status'.
-
-(defvar symon--memory-status nil)
-(defvar symon--swap-status nil)
-(defvar symon--cpu-status nil)
-(defvar symon--battery-status nil)
+;; and expected to commit status values via `symon-commit-status'.
 
 (defmacro define-symon-fetcher (name &rest plist)
   `(put ',name 'symon-fetcher
         (vector (lambda () ,(plist-get plist :setup))
                 (lambda () ,(plist-get plist :cleanup))
                 (lambda () ,(plist-get plist :update)))))
-
-(defun symon-commit-status (status value)
-  (ring-insert (cl-case status
-                 ((memory)  symon--memory-status)
-                 ((swap)    symon--swap-status)
-                 ((cpu)     symon--cpu-status)
-                 ((battery) symon--battery-status)) value))
 
 ;; + symon core
 
@@ -112,28 +124,19 @@ BEFORE enabling `symon-mode'.*"
 (defvar symon--display-active nil)
 (defvar symon--timer-objects nil)
 
-(defun symon--make-ring (size init)
-  "like `make-ring' but INIT can be specified."
-  (cons 0 (cons size (make-vector size init))))
-
 ;;;###autoload
 (define-minor-mode symon-mode
   "tiny graphical system monitor"
   :init-value nil
   :global t
   (cond (symon-mode
-         (unless symon-fetcher
-           (setq symon-mode nil)
-           (error "`symon-fetcher' is not set."))
-         (dolist (var '(symon--memory-status
-                        symon--swap-status
-                        symon--cpu-status
-                        symon--battery-status))
-           (set var (symon--make-ring symon-history-size nil)))
-         (let ((vec (get symon-fetcher 'symon-fetcher)))
-           (funcall (aref vec 0))
-           (setq symon--cleanup-function       (aref vec 1)
-                 symon--status-update-function (aref vec 2)))
+         (setq symon--statuses nil)
+         (if (null symon-fetcher)
+             (error "`symon-fetcher' is not set.")
+           (let ((vec (get symon-fetcher 'symon-fetcher)))
+             (funcall (aref vec 0))
+             (setq symon--cleanup-function       (aref vec 1)
+                   symon--status-update-function (aref vec 2))))
          (setq symon--timer-objects
                (list (run-with-timer 0 symon-refresh-rate 'symon--update)
                      (run-with-idle-timer symon-delay t 'symon--display)))
@@ -143,42 +146,48 @@ BEFORE enabling `symon-mode'.*"
          (mapc 'cancel-timer symon--timer-objects)
          (funcall symon--cleanup-function))))
 
-(defun symon--make-sparkline (ring)
-  "make sparkline image from RING."
+(defun symon--make-sparkline (list &optional upper-bound)
+  "make sparkline image from LIST."
   (let ((image-data
          (make-bool-vector (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
-        (num-samples (ring-size ring))
-        (samples (apply 'vector (ring-elements ring)))
+        (num-samples (length list))
+        (samples (apply 'vector list))
         (width (car symon-sparkline-size))
         (height (cdr symon-sparkline-size)))
-    (let ((height-per-point (/ height 100.0))
-          (width-per-sample (/ width (float num-samples)))
-          sample y)
-      (dotimes (x width)
-        (setq sample (aref samples (floor (/ x width-per-sample))))
-        (when (numberp sample)
-          (setq y (floor (* (if (= sample 100) 99 sample) height-per-point)))
-          (aset image-data (+ (* (- height y 1) width) x) t)))
-      `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100))))
+    (unless (zerop num-samples)
+      (let ((height-per-point (/ height (if upper-bound (float upper-bound) 100.0)))
+            (width-per-sample (/ width (float num-samples)))
+            sample y)
+        (dotimes (x width)
+          (setq sample (aref samples (floor (/ x width-per-sample))))
+          (when (numberp sample)
+            (setq y (floor (* (if (= sample 100) 99 sample) height-per-point)))
+            (when (< y height)
+              (aset image-data (+ (* (- height y 1) width) x) t))))))
+    `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
 (defun symon--display ()
   "activate symon display."
   (interactive)
   (when (not (active-minibuffer-window))
-    (let ((memory (ring-ref symon--memory-status 0))
-          (swap (ring-ref symon--swap-status 0))
-          (cpu (ring-ref symon--cpu-status 0))
-          (battery (ring-ref symon--battery-status 0))
-          (message-log-max nil))   ; do not insert to *Messages* buffer
+    (let* ((memory-lst (symon--status-history 'memory))
+           (memory (car memory-lst))
+           (swap-lst (symon--status-history 'swap))
+           (swap (car swap-lst))
+           (cpu-lst (symon--status-history 'cpu))
+           (cpu (car cpu-lst))
+           (battery-lst (symon--status-history 'battery))
+           (battery (car battery-lst))
+           (message-log-max nil))   ; do not insert to *Messages* buffer
       (message
        (concat
         "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
         (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
-        (propertize " " 'display (symon--make-sparkline symon--memory-status)) " "
+        (propertize " " 'display (symon--make-sparkline memory-lst)) " "
         "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
-        (propertize " " 'display (symon--make-sparkline symon--cpu-status)) " "
+        (propertize " " 'display (symon--make-sparkline cpu-lst)) " "
         "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
-        (propertize " " 'display (symon--make-sparkline symon--battery-status)))))
+        (propertize " " 'display (symon--make-sparkline battery-lst)))))
     (setq symon--display-active t)))
 
 (defun symon--update ()
