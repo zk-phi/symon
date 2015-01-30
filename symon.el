@@ -115,6 +115,7 @@ BEFORE calling `symon-initialize'.*"
   "like `make-ring' but INIT can be specified."
   (cons 0 (cons size (make-vector size init))))
 
+;;;###autoload
 (define-minor-mode symon-mode
   "tiny graphical system monitor"
   :init-value nil
