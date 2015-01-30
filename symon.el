@@ -102,7 +102,7 @@ BEFORE enabling `symon-mode'.*"
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
             (setq y (floor (* sample height-per-point)))
-            (when (and (< 0 y) (< y height))
+            (when (and (<= 0 y) (< y height))
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
@@ -256,14 +256,13 @@ BEFORE enabling `symon-mode'.*"
            (battery (car battery-lst))
            (message-log-max nil))   ; do not insert to *Messages* buffer
       (message
-       (concat
-        "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
-        (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
-        (propertize " " 'display (symon--make-sparkline memory-lst)) " "
-        "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
-        (propertize " " 'display (symon--make-sparkline cpu-lst)) " "
-        "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
-        (propertize " " 'display (symon--make-sparkline battery-lst)))))
+       (concat "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
+               (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
+               (propertize " " 'display (symon--make-sparkline memory-lst)) " "
+               "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
+               (propertize " " 'display (symon--make-sparkline cpu-lst)) " "
+               "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
+               (propertize " " 'display (symon--make-sparkline battery-lst)))))
     (setq symon--display-active t)))
 
 (defun symon--update ()
