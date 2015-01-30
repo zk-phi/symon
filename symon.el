@@ -49,7 +49,7 @@
 
 ;; + customs
 
-(defcustom symon-history-size 100
+(defcustom symon-history-size 50
   "number of old values to keep. sparklines grow faster when set
 smaller. *set this option BEFORE enabling `symon-mode'.*"
   :group 'symon)
@@ -116,6 +116,71 @@ BEFORE enabling `symon-mode'.*"
         (vector (lambda () ,(plist-get plist :setup))
                 (lambda () ,(plist-get plist :cleanup))
                 (lambda () ,(plist-get plist :update)))))
+
+;; linux fetcher
+(defvar symon-default-linux-fetcher--last-cpu-ticks nil)
+(define-symon-fetcher symon-default-linux-fetcher
+  :setup (setq symon-default-linux-fetcher--last-cpu-ticks '(0 . 0))
+  :update (progn
+            ;; CPU
+            (if (file-exists-p "/proc/stat")
+                (let* ((str (shell-command-to-string "cat /proc/stat"))
+                       (_ (string-match "^cpu\\_>\\(.*\\)$" str))
+                       (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
+                       (total (apply '+ lst))
+                       (idle (nth 3 lst))
+                       (total-diff (- total (car symon-default-linux-fetcher--last-cpu-ticks)))
+                       (idle-diff (- idle (cdr symon-default-linux-fetcher--last-cpu-ticks))))
+                  (setq symon-default-linux-fetcher--last-cpu-ticks (cons total idle))
+                  (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
+              (symon-commit-status 'cpu nil))
+            ;; Memory / Swap
+            (if (executable-find "free")
+                (cl-destructuring-bind (_ mem swap . __)
+                    (split-string (shell-command-to-string "free -o -m") "\n")
+                  (setq mem  (cdr (split-string mem))
+                        swap (cdr (split-string swap)))
+                  (symon-commit-status 'memory (/ (* (read (cadr mem)) 100) (read (car mem))))
+                  (symon-commit-status 'swap   (read (cadr swap))))
+              (symon-commit-status 'memory nil)
+              (symon-commit-status 'swap   nil))
+            ;; Battery
+            (symon-commit-status 'battery
+                                 (when battery-status-function
+                                   (read (cdr (assoc ?p (funcall battery-status-function))))))))
+
+;; windows fetcher
+(define-symon-fetcher symon-default-windows-fetcher
+  :setup (set-process-query-on-exit-flag
+          (start-process-shell-command
+           "symon-typeperf" " *symon-typeperf*"
+           (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
+                   symon-refresh-rate)) nil)
+  :cleanup (kill-buffer " *symon-typeperf*")
+  :update (progn
+            ;; CPU
+            (if (buffer-live-p (get-buffer " *symon-typeperf*"))
+                (with-current-buffer " *symon-typeperf*"
+                  (save-excursion
+                    (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+                        (progn
+                          (symon-commit-status 'cpu (round (read (match-string 1))))
+                          (delete-region (point-min) (point)))
+                      (symon-commit-status 'cpu nil))))
+              (symon-commit-status 'cpu nil))
+            ;; Memory
+            (let* ((info (cadr (w32-memory-info)))
+                   (total (cadr info))
+                   (free (cl-caddr info)))
+              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
+            ;; Swap (is this correct ?)
+            (if (executable-find "wmic")
+                (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
+                  (string-match "^[0-9]+\\>" str)
+                  (symon-commit-status 'swap (read (match-string 0 str))))
+              (symon-commit-status 'swap nil))
+            ;; Battery
+            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
 
 ;; + symon core
 
@@ -200,74 +265,6 @@ BEFORE enabling `symon-mode'.*"
   (setq symon--display-active nil))
 
 (define-obsolete-function-alias 'symon-initialize 'symon-mode "1/30/2015")
-
-;; + windows fetcher
-
-(define-symon-fetcher symon-default-windows-fetcher
-  :setup (set-process-query-on-exit-flag
-          (start-process-shell-command
-           "symon-typeperf" " *symon-typeperf*"
-           (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
-                   symon-refresh-rate)) nil)
-  :cleanup (kill-buffer " *symon-typeperf*")
-  :update (progn
-            ;; CPU
-            (if (buffer-live-p (get-buffer " *symon-typeperf*"))
-                (with-current-buffer " *symon-typeperf*"
-                  (save-excursion
-                    (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
-                        (progn
-                          (symon-commit-status 'cpu (round (read (match-string 1))))
-                          (delete-region (point-min) (point)))
-                      (symon-commit-status 'cpu nil))))
-              (symon-commit-status 'cpu nil))
-            ;; Memory
-            (let* ((info (cadr (w32-memory-info)))
-                   (total (cadr info))
-                   (free (cl-caddr info)))
-              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
-            ;; Swap (is this correct ?)
-            (if (executable-find "wmic")
-                (let ((str (shell-command-to-string "wmic path Win32_PageFileUsage get CurrentUsage")))
-                  (string-match "^[0-9]+\\>" str)
-                  (symon-commit-status 'swap (read (match-string 0 str))))
-              (symon-commit-status 'swap nil))
-            ;; Battery
-            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
-
-;; + linux fetcher
-
-(defvar symon-default-linux-fetcher--last-cpu-ticks nil)
-
-(define-symon-fetcher symon-default-linux-fetcher
-  :setup (setq symon-default-linux-fetcher--last-cpu-ticks '(0 . 0))
-  :update (progn
-            ;; CPU
-            (if (file-exists-p "/proc/stat")
-                (let* ((str (shell-command-to-string "cat /proc/stat"))
-                       (_ (string-match "^cpu\\_>\\(.*\\)$" str))
-                       (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
-                       (total (apply '+ lst))
-                       (idle (nth 3 lst))
-                       (total-diff (- total (car symon-default-linux-fetcher--last-cpu-ticks)))
-                       (idle-diff (- idle (cdr symon-default-linux-fetcher--last-cpu-ticks))))
-                  (setq symon-default-linux-fetcher--last-cpu-ticks (cons total idle))
-                  (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
-              (symon-commit-status 'cpu nil))
-            ;; Memory / Swap
-            (if (executable-find "free")
-                (cl-destructuring-bind (_ mem swap . __)
-                    (split-string (shell-command-to-string "free -o -m") "\n")
-                  (setq mem  (cdr (split-string mem))
-                        swap (cdr (split-string swap)))
-                  (symon-commit-status 'memory (/ (* (read (cadr mem)) 100) (read (car mem))))
-                  (symon-commit-status 'swap   (read (cadr swap))))
-              (symon-commit-status 'memory nil)
-              (symon-commit-status 'swap   nil))
-            ;; Battery
-            (symon-commit-status 'battery
-                                 (when battery-status-function
-                                   (read (cdr (assoc ?p (funcall battery-status-function))))))))
 
 ;; + provide
 
