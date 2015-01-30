@@ -26,9 +26,9 @@
 ;;
 ;;   (require 'symon)
 ;;
-;; and initialize
+;; and activate.
 ;;
-;;   (symon-initialize)
+;;   (symon-mode)
 ;;
 ;; then a tiny system monitor is displayed in minibuffer, during idle.
 
@@ -50,17 +50,17 @@
 
 (defcustom symon-history-size 100
   "number of old values to keep. sparklines grow faster when set
-smaller. *set this option BEFORE calling `symon-initialize'.*"
+smaller. *set this option BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
 (defcustom symon-refresh-rate 3
   "refresh rate of status values in seconds. *set this option
-  BEFORE calling `symon-initialize'.*"
+  BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
 (defcustom symon-delay 2
   "delay in seconds until symon is displayed. *set this option
-BEFORE calling `symon-initialize'.*"
+BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
 (defcustom symon-fetcher
@@ -70,8 +70,8 @@ BEFORE calling `symon-initialize'.*"
   "fetcher function to read system statuses. you can use
   preconfigured fetcher `symon-default-linux-fetcher' or
   `symon-default-windows-fetcher', or implement your own with
-  `define-symon-fetcher'. *set this option BEFORE calling
-  `symon-initialize'.*"
+  `define-symon-fetcher'. *set this option BEFORE enabling
+  `symon-mode'.*"
   :group 'symon)
 
 (defcustom symon-sparkline-size '(80 . 11)

@@ -22,7 +22,7 @@ and activate.
 
 : (symon-mode)
 
-then a tiny system monitor is displayed in minibuffer during idle.
+then a tiny system monitor is displayed in minibuffer, during idle.
 
 ** Supported Systems
 
