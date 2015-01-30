@@ -102,7 +102,7 @@ BEFORE enabling `symon-mode'.*"
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
             (setq y (floor (* sample height-per-point)))
-            (when (< y height)
+            (when (and (< 0 y) (< y height))
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
@@ -144,38 +144,6 @@ BEFORE enabling `symon-mode'.*"
                 (lambda () ,(plist-get plist :cleanup))
                 (lambda () ,(plist-get plist :update)))))
 
-;; windows fetcher
-(define-symon-fetcher symon-default-windows-fetcher
-  :setup (set-process-query-on-exit-flag
-          (start-process-shell-command
-           "symon-typeperf" " *symon-typeperf*"
-           (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
-                   symon-refresh-rate)) nil)
-  :cleanup (kill-buffer " *symon-typeperf*")
-  :update (progn
-            ;; CPU
-            (if (buffer-live-p (get-buffer " *symon-typeperf*"))
-                (with-current-buffer " *symon-typeperf*"
-                  (save-excursion
-                    (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
-                        (progn
-                          (symon-commit-status 'cpu (round (read (match-string 1))))
-                          (delete-region (point-min) (point)))
-                      (symon-commit-status 'cpu nil))))
-              (symon-commit-status 'cpu nil))
-            ;; Memory
-            (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
-              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
-            ;; Swap (is this correct ?)
-            (if (executable-find "wmic")
-                (let ((str (shell-command-to-string
-                            "wmic path Win32_PageFileUsage get CurrentUsage")))
-                  (string-match "^[0-9]+\\>" str)
-                  (symon-commit-status 'swap (read (match-string 0 str))))
-              (symon-commit-status 'swap nil))
-            ;; Battery
-            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
-
 ;; linux fetcher
 (defvar symon--last-cpu-ticks nil)
 (define-symon-fetcher symon-default-linux-fetcher
@@ -212,6 +180,38 @@ BEFORE enabling `symon-mode'.*"
             (symon-commit-status 'battery
                                  (when battery-status-function
                                    (read (cdr (assoc ?p (funcall battery-status-function))))))))
+
+;; windows fetcher
+(define-symon-fetcher symon-default-windows-fetcher
+  :setup (set-process-query-on-exit-flag
+          (start-process-shell-command
+           "symon-typeperf" " *symon-typeperf*"
+           (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
+                   symon-refresh-rate)) nil)
+  :cleanup (kill-buffer " *symon-typeperf*")
+  :update (progn
+            ;; CPU
+            (if (buffer-live-p (get-buffer " *symon-typeperf*"))
+                (with-current-buffer " *symon-typeperf*"
+                  (save-excursion
+                    (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+                        (progn
+                          (symon-commit-status 'cpu (round (read (match-string 1))))
+                          (delete-region (point-min) (point)))
+                      (symon-commit-status 'cpu nil))))
+              (symon-commit-status 'cpu nil))
+            ;; Memory
+            (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
+              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
+            ;; Swap (is this correct ?)
+            (if (executable-find "wmic")
+                (let ((str (shell-command-to-string
+                            "wmic path Win32_PageFileUsage get CurrentUsage")))
+                  (string-match "^[0-9]+\\>" str)
+                  (symon-commit-status 'swap (read (match-string 0 str))))
+              (symon-commit-status 'swap nil))
+            ;; Battery
+            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
 
 ;; + symon core
 
