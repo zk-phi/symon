@@ -228,10 +228,11 @@ BEFORE enabling `symon-mode'.*"
                 " && echo path Win32_Battery get EstimatedChargeRemaining"
                 " && echo path Win32_PageFileUsage get CurrentUsage"
                 " && echo exit) | wmic"))))
-    ;; wmic leaves an useless bat file "TempWmicBatchFile.bat" (why?)
+    ;; delete useless bat file that wmic leaves.
     (when (file-exists-p "TempWmicBatchFile.bat")
       (delete-file "TempWmicBatchFile.bat"))
-    ;; read values and commit
+    ;; read values and commit. be careful that output format of `wmic'
+    ;; is changed in Win 8 (https://github.com/zk-phi/symon/issues/1).
     (goto-char (point-min))
     (let (memtotal memfree battery swap)
       (dolist (var '(memtotal memfree battery swap))
