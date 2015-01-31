@@ -163,12 +163,12 @@ BEFORE enabling `symon-mode'.*"
              (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
              (total (apply '+ lst))
              (idle (nth 3 lst)))
-        (setq symon--default-linux-last-cpu-ticks (cons total idle))
         (if symon--default-linux-last-cpu-ticks
             (let ((total-diff (- total (car symon--default-linux-last-cpu-ticks)))
                   (idle-diff (- idle (cdr symon--default-linux-last-cpu-ticks))))
               (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
-          (symon-commit-status 'cpu nil)))
+          (symon-commit-status 'cpu nil))
+        (setq symon--default-linux-last-cpu-ticks (cons total idle)))
     (symon-commit-status 'cpu nil))
   ;; Memory / Swap
   (if (file-exists-p "/proc/meminfo")
