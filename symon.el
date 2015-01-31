@@ -201,6 +201,13 @@ BEFORE enabling `symon-mode'.*"
 
 (defvar symon--default-windows-timer-object nil)
 
+(defconst symon--powershell-wmi-command
+  (concat "echo ----;"
+          "(gwmi Win32_ComputerSystem).TotalPhysicalMemory;"
+          "(gwmi Win32_OperatingSystem).FreePhysicalMemory;"
+          "(gwmi Win32_Battery).EstimatedChargeRemaining;"
+          "(gwmi Win32_PageFileUsage).CurrentUsage"))
+
 (define-symon-fetcher symon-default-windows-fetcher
   :setup (progn
            (set-process-query-on-exit-flag
@@ -208,19 +215,16 @@ BEFORE enabling `symon-mode'.*"
              "symon-typeperf" " *symon-typeperf*"
              (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
                      symon-refresh-rate)) nil)
+           (with-current-buffer (get-buffer-create " *symon-wmi*")
+             (insert
+              (shell-command-to-string
+               (concat "powershell -command " symon--powershell-wmi-command))))
            (set-process-query-on-exit-flag
             (start-process-shell-command
              "symon-wmi" " *symon-wmi*"
-             (format (eval-when-compile
-                       (concat "powershell -command while(1) {"
-                               "echo ----;"
-                               "(gwmi Win32_ComputerSystem).TotalPhysicalMemory;"
-                               "(gwmi Win32_OperatingSystem).FreePhysicalMemory;"
-                               "(gwmi Win32_Battery).EstimatedChargeRemaining;"
-                               "(gwmi Win32_PageFileUsage).CurrentUsage;"
-                               "sleep %d"
-                               "}"))
-                     symon-refresh-rate)) nil)
+             (format "powershell -command while(1) {sleep %d;%s}"
+                     symon-refresh-rate
+                     symon--powershell-wmi-command)) nil)
            (setq symon--default-windows-timer-object
                  (run-with-timer 0 symon-refresh-rate
                                  'symon--default-windows-update-function)))
