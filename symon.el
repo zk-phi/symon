@@ -201,8 +201,10 @@ BEFORE enabling `symon-mode'.*"
                       (symon-commit-status 'cpu nil))))
               (symon-commit-status 'cpu nil))
             ;; Memory
-            (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
-              (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
+            (if (fboundp 'w32-memory-info)
+                (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
+                  (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
+              (symon-commit-status 'memory nil))
             ;; Swap (is this correct ?)
             (if (executable-find "wmic")
                 (let ((str (shell-command-to-string
@@ -211,7 +213,9 @@ BEFORE enabling `symon-mode'.*"
                   (symon-commit-status 'swap (read (match-string 0 str))))
               (symon-commit-status 'swap nil))
             ;; Battery
-            (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))))
+            (if (fboundp 'w32-battery-status)
+                (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))
+              (symon-commit-status 'battery nil))))
 
 ;; + symon core
 
