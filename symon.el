@@ -237,7 +237,7 @@ BEFORE enabling `symon-mode'.*"
       (dolist (var '(memtotal memfree battery swap))
         (search-forward-regexp "^[0-9]+\\>")
         (set var (read (match-string 0))))
-      (setq memtotal (floor (/ memtotal 1000)))
+      (setq memtotal (floor (/ memtotal 1000))) ; Bytes -> KBytes
       (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
       (symon-commit-status 'swap    swap)
       (symon-commit-status 'battery battery))))
