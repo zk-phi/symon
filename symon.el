@@ -149,6 +149,12 @@ BEFORE enabling `symon-mode'.*"
 (defvar symon--default-linux-last-cpu-ticks nil)
 (defvar symon--default-linux-timer-object nil)
 
+(define-symon-fetcher symon-default-linux-fetcher
+  :setup (setq symon--default-linux-last-cpu-ticks nil
+               symon--default-linux-timer-object
+               (run-with-timer 0 symon-refresh-rate 'symon--default-linux-update-function))
+  :cleanup (cancel-timer symon--default-linux-timer-object))
+
 (defun symon--default-linux-update-function ()
   ;; CPU
   (if (file-exists-p "/proc/stat")
@@ -184,43 +190,9 @@ BEFORE enabling `symon-mode'.*"
                        (when battery-status-function
                          (read (cdr (assoc ?p (funcall battery-status-function)))))))
 
-(define-symon-fetcher symon-default-linux-fetcher
-  :setup (setq symon--default-linux-last-cpu-ticks nil
-               symon--default-linux-timer-object
-               (run-with-timer 0 symon-refresh-rate 'symon--default-linux-update-function))
-  :cleanup (cancel-timer symon--default-linux-timer-object))
-
 ;; windows fetcher
 
 (defvar symon--default-windows-timer-object nil)
-
-(defun symon--default-windows-update-function ()
-  ;; CPU
-  (if (buffer-live-p (get-buffer " *symon-typeperf*"))
-      (with-current-buffer " *symon-typeperf*"
-        (save-excursion
-          (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
-              (progn
-                (symon-commit-status 'cpu (round (read (match-string 1))))
-                (delete-region (point-min) (point)))
-            (symon-commit-status 'cpu nil))))
-    (symon-commit-status 'cpu nil))
-  ;; Memory
-  (if (fboundp 'w32-memory-info)
-      (cl-destructuring-bind (_ total free . __) (cadr (w32-memory-info))
-        (symon-commit-status 'memory (round (/ (* (- total free) 100) total))))
-    (symon-commit-status 'memory nil))
-  ;; Swap
-  (if (executable-find "wmic")
-      (let ((str (shell-command-to-string
-                  "wmic path Win32_PageFileUsage get CurrentUsage")))
-        (string-match "^[0-9]+\\>" str)
-        (symon-commit-status 'swap (read (match-string 0 str))))
-    (symon-commit-status 'swap nil))
-  ;; Battery
-  (if (fboundp 'w32-battery-status)
-      (symon-commit-status 'battery (read (cdr (assoc ?p (w32-battery-status)))))
-    (symon-commit-status 'battery nil)))
 
 (define-symon-fetcher symon-default-windows-fetcher
   :setup (progn
@@ -234,6 +206,37 @@ BEFORE enabling `symon-mode'.*"
   :cleanup (progn
              (cancel-timer symon--default-windows-timer-object)
              (kill-buffer " *symon-typeperf*")))
+
+(defun symon--default-windows-update-function ()
+  ;; typeperf (CPU)
+  (if (buffer-live-p (get-buffer " *symon-typeperf*"))
+      (with-current-buffer " *symon-typeperf*"
+        (save-excursion
+          (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+              (progn
+                (symon-commit-status 'cpu (round (read (match-string 1))))
+                (delete-region (point-min) (point)))
+            (symon-commit-status 'cpu nil))))
+    (symon-commit-status 'cpu nil))
+  ;; wmic (Memory / Swap, Battery)
+  (let* ((str (shell-command-to-string
+               (eval-when-compile
+                 (concat "(echo path Win32_ComputerSystem get TotalPhysicalMemory"
+                         " && echo path Win32_OperatingSystem get FreePhysicalMemory"
+                         " && echo path Win32_Battery get EstimatedChargeRemaining"
+                         " && echo path Win32_PageFileUsage get CurrentUsage"
+                         " && echo exit) | wmic"))))
+         (_ (string-match "^TotalPhysicalMemory.*\n\\(.*\\)$" str))
+         (memtotal (floor (/ (read (match-string 1 str)) 1000)))
+         (_ (string-match "^FreePhysicalMemory.*\n\\(.*\\)$" str))
+         (memfree (read (match-string 1 str)))
+         (_ (string-match "^EstimatedChargeRemaining.*\n\\(.*\\)$" str))
+         (battery (read (match-string 1 str)))
+         (_ (string-match "^CurrentUsage.*\n\\(.*\\)$" str))
+         (swap (read (match-string 1 str))))
+    (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
+    (symon-commit-status 'swap    swap)
+    (symon-commit-status 'battery battery)))
 
 ;; + symon core
 
