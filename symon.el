@@ -219,26 +219,28 @@ BEFORE enabling `symon-mode'.*"
             (symon-commit-status 'cpu nil))))
     (symon-commit-status 'cpu nil))
   ;; wmic (Memory / Swap, Battery)
-  (let* ((str (shell-command-to-string
-               (eval-when-compile
-                 (concat "(echo path Win32_ComputerSystem get TotalPhysicalMemory"
-                         " && echo path Win32_OperatingSystem get FreePhysicalMemory"
-                         " && echo path Win32_Battery get EstimatedChargeRemaining"
-                         " && echo path Win32_PageFileUsage get CurrentUsage"
-                         " && echo exit) | wmic"))))
-         (_ (string-match "^TotalPhysicalMemory.*\n\\(.*\\)$" str))
-         (memtotal (floor (/ (read (match-string 1 str)) 1000)))
-         (_ (string-match "^FreePhysicalMemory.*\n\\(.*\\)$" str))
-         (memfree (read (match-string 1 str)))
-         (_ (string-match "^EstimatedChargeRemaining.*\n\\(.*\\)$" str))
-         (battery (read (match-string 1 str)))
-         (_ (string-match "^CurrentUsage.*\n\\(.*\\)$" str))
-         (swap (read (match-string 1 str))))
+  (with-temp-buffer
+    (insert
+     (shell-command-to-string
+      (eval-when-compile
+        (concat "(echo path Win32_ComputerSystem get TotalPhysicalMemory"
+                " && echo path Win32_OperatingSystem get FreePhysicalMemory"
+                " && echo path Win32_Battery get EstimatedChargeRemaining"
+                " && echo path Win32_PageFileUsage get CurrentUsage"
+                " && echo exit) | wmic"))))
+    ;; wmic leaves an useless bat file "TempWmicBatchFile.bat" (why?)
     (when (file-exists-p "TempWmicBatchFile.bat")
       (delete-file "TempWmicBatchFile.bat"))
-    (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
-    (symon-commit-status 'swap    swap)
-    (symon-commit-status 'battery battery)))
+    ;; read values and commit
+    (goto-char (point-min))
+    (let (memtotal memfree battery swap)
+      (dolist (var '(memtotal memfree battery swap))
+        (search-forward-regexp "^[0-9]+\\>")
+        (set var (read (match-string 0))))
+      (setq memtotal (floor (/ memtotal 1000)))
+      (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
+      (symon-commit-status 'swap    swap)
+      (symon-commit-status 'battery battery))))
 
 ;; + symon core
 
@@ -270,7 +272,7 @@ BEFORE enabling `symon-mode'.*"
 (defun symon--display ()
   "activate symon display."
   (interactive)
-  (when (not (active-minibuffer-window))
+  (unless (active-minibuffer-window)
     (let* ((memory-lst (symon--status-history 'memory))
            (memory (car memory-lst))
            (swap-lst (symon--status-history 'swap))
