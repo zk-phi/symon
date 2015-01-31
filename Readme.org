@@ -24,31 +24,19 @@ and activate.
 
 then a tiny system monitor is displayed in minibuffer, during idle.
 
-** Supported Systems
+** Supported Systems / Provided Informations
 
 - Linux
+  - memory usage (%), swapped memory (MB) via =/proc/meminfo=
+  - CPU load (%) via =/proc/stat=
+  - remaining battery (%) via built-in library =battery.el=
+
 - Windows (XP or later)
+  - memory usage (%), pagefile usage (MB), remaining battery (%) via
+    =powershell= (=WMI=)
+  - CPU load (%) via =typeperf=
 
 other systems are unsupported for now (contributions are welcome!).
-
-** Provided Informations
-
-- memory usage (%)
-  - Linux : =/proc/meminfo=
-  - Windows : =wmic path Win32_ComputerSystem get TotalPhysicalMemory=
-    and =wmic path Win32_OperatingSystem get FreePhysicalMemory=
-
-- swapped memory (MB)
-  - Linux : =/proc/meminfo=
-  - Windows : =wmic path Win32_PageFileUsage get CurrentUsage=
-
-- CPU usage (%)
-  - Linux : =/proc/stat=
-  - Windows : =typeperf "\Processor(_Total)\% Processor Time"​=
-
-- remaining battery (%)
-  - Linux : one of =/proc/apm=, =/proc/acpi/battery=, =/sys/class/power_supply=
-  - Windows : =wmic path Win32_Battery get EstimatedChargeRemaining=
 
 network informations are probably added someday.
 

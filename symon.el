@@ -208,47 +208,59 @@ BEFORE enabling `symon-mode'.*"
              "symon-typeperf" " *symon-typeperf*"
              (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
                      symon-refresh-rate)) nil)
+           (set-process-query-on-exit-flag
+            (start-process-shell-command
+             "symon-wmi" " *symon-wmi*"
+             (format (eval-when-compile
+                       (concat "powershell -command while(1) {"
+                               "echo ----;"
+                               "(gwmi Win32_ComputerSystem).TotalPhysicalMemory;"
+                               "(gwmi Win32_OperatingSystem).FreePhysicalMemory;"
+                               "(gwmi Win32_Battery).EstimatedChargeRemaining;"
+                               "(gwmi Win32_PageFileUsage).CurrentUsage;"
+                               "sleep %d"
+                               "}"))
+                     symon-refresh-rate)) nil)
            (setq symon--default-windows-timer-object
-                 (run-with-timer 0 symon-refresh-rate 'symon--default-windows-update-function)))
+                 (run-with-timer 0 symon-refresh-rate
+                                 'symon--default-windows-update-function)))
   :cleanup (progn
              (cancel-timer symon--default-windows-timer-object)
-             (kill-buffer " *symon-typeperf*")))
+             (kill-buffer " *symon-typeperf*")
+             (kill-buffer " *symon-wmi*")))
 
 (defun symon--default-windows-update-function ()
   ;; typeperf (CPU)
   (if (buffer-live-p (get-buffer " *symon-typeperf*"))
       (with-current-buffer " *symon-typeperf*"
         (save-excursion
-          (if (search-backward-regexp "\",\"\\(.*\\)\"" nil t)
-              (progn
-                (symon-commit-status 'cpu (round (read (match-string 1))))
-                (delete-region (point-min) (point)))
-            (symon-commit-status 'cpu nil))))
+          (cond ((search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+                 (symon-commit-status 'cpu (round (read (match-string 1))))
+                 (delete-region (point-min) (point)))
+                (t
+                 (symon-commit-status 'cpu nil)))))
     (symon-commit-status 'cpu nil))
   ;; wmic (Memory / Swap, Battery)
-  (with-temp-buffer
-    (insert
-     (shell-command-to-string
-      (eval-when-compile
-        (concat "(echo path Win32_ComputerSystem get TotalPhysicalMemory"
-                " && echo path Win32_OperatingSystem get FreePhysicalMemory"
-                " && echo path Win32_Battery get EstimatedChargeRemaining"
-                " && echo path Win32_PageFileUsage get CurrentUsage"
-                " && echo exit) | wmic"))))
-    ;; delete useless bat file that wmic leaves.
-    (when (file-exists-p "TempWmicBatchFile.bat")
-      (delete-file "TempWmicBatchFile.bat"))
-    ;; read values and commit. be careful that output format of `wmic'
-    ;; is changed in Win 8 (https://github.com/zk-phi/symon/issues/1).
-    (goto-char (point-min))
-    (let (memtotal memfree battery swap)
-      (dolist (var '(memtotal memfree battery swap))
-        (search-forward-regexp "^[0-9]+\\>")
-        (set var (read (match-string 0))))
-      (setq memtotal (floor (/ memtotal 1000))) ; Bytes -> KBytes
-      (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
-      (symon-commit-status 'swap    swap)
-      (symon-commit-status 'battery battery))))
+  (if (buffer-live-p (get-buffer " *symon-wmi*"))
+      (with-current-buffer " *symon-wmi*"
+        (save-excursion
+          (cond ((search-backward "----" nil t)
+                 (delete-region (point-min) (point))
+                 (let (memtotal memfree battery swap)
+                   (dolist (var '(memtotal memfree battery swap))
+                     (search-forward-regexp "^[0-9]+\\>")
+                     (set var (read (match-string 0))))
+                   (setq memtotal (floor (/ memtotal 1000))) ; Bytes -> KBytes
+                   (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
+                   (symon-commit-status 'swap    swap)
+                   (symon-commit-status 'battery battery)))
+                (t
+                 (symon-commit-status 'memory  nil)
+                 (symon-commit-status 'swap    nil)
+                 (symon-commit-status 'battery nil)))))
+    (symon-commit-status 'memory  nil)
+    (symon-commit-status 'swap    nil)
+    (symon-commit-status 'battery nil)))
 
 ;; + symon core
 
