@@ -307,12 +307,12 @@ BEFORE enabling `symon-mode'.*"
            (battery (car battery-lst))
            (message-log-max nil))   ; do not insert to *Messages* buffer
       (message
-       (concat "MEM:" (if (not (integerp memory)) "N/A " (format "%2d%%%% " memory))
-               (when (and (integerp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
+       (concat "MEM:" (if (not (numberp memory)) "N/A " (format "%2d%%%% " memory))
+               (when (and (numberp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
                (propertize " " 'display (symon--make-sparkline memory-lst)) " "
-               "CPU:" (if (not (integerp cpu)) "N/A " (format "%2d%%%% " cpu))
+               "CPU:" (if (not (numberp cpu)) "N/A " (format "%2d%%%% " cpu))
                (propertize " " 'display (symon--make-sparkline cpu-lst)) " "
-               "BAT:" (if (not (integerp battery)) "N/A " (format "%d%%%% " battery))
+               "BAT:" (if (not (numberp battery)) "N/A " (format "%d%%%% " battery))
                (propertize " " 'display (symon--make-sparkline battery-lst)))))
     (setq symon--display-active t)))
 
