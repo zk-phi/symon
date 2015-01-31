@@ -35,7 +35,8 @@ other systems are unsupported for now (contributions are welcome!).
 
 - memory usage (%)
   - Linux : =/proc/meminfo=
-  - Windows : =(w32-memory-info)=
+  - Windows : =wmic path Win32_ComputerSystem get TotalPhysicalMemory=
+    and =wmic path Win32_OperatingSystem get FreePhysicalMemory=
 
 - swapped memory (MB)
   - Linux : =/proc/meminfo=
@@ -47,7 +48,7 @@ other systems are unsupported for now (contributions are welcome!).
 
 - remaining battery (%)
   - Linux : one of =/proc/apm=, =/proc/acpi/battery=, =/sys/class/power_supply=
-  - Windows : =(w32-battery-status)=
+  - Windows : =wmic path Win32_Battery get EstimatedChargeRemaining=
 
 network informations are probably added someday.
 
