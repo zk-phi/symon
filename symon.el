@@ -234,6 +234,8 @@ BEFORE enabling `symon-mode'.*"
          (battery (read (match-string 1 str)))
          (_ (string-match "^CurrentUsage.*\n\\(.*\\)$" str))
          (swap (read (match-string 1 str))))
+    (when (file-exists-p "TempWmicBatchFile.bat")
+      (delete-file "TempWmicBatchFile.bat"))
     (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
     (symon-commit-status 'swap    swap)
     (symon-commit-status 'battery battery)))
