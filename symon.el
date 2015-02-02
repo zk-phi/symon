@@ -84,31 +84,32 @@ BEFORE enabling `symon-mode'.*"
 (defun symon--file-contents (file)
   (with-temp-buffer (insert-file-contents file) (buffer-string)))
 
-(defun symon--make-sparkline (list &optional lim)
+(defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
   (let ((image-data
          (make-bool-vector
           (* (car symon-sparkline-size) (cdr symon-sparkline-size)) nil))
-        (lim (if lim (float lim) 100.0))
+        (maximum (if maximum (float maximum) 100.0))
+        (minimum (if minimum (float minimum) 0.0))
         (num-samples (length list))
         (samples (apply 'vector list))
         (width (car symon-sparkline-size))
         (height (cdr symon-sparkline-size)))
     (unless (zerop num-samples)
-      (let ((height-per-point (/ height (1+ lim)))
+      (let ((height-per-point (/ height (1+ (- maximum minimum))))
             (width-per-sample (/ width (float num-samples)))
             sample y)
         (dotimes (x width)
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
-            (setq y (floor (* sample height-per-point)))
+            (setq y (floor (* (- sample minimum) height-per-point)))
             (when (and (<= 0 y) (< y height))
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
 ;; + status rings
 
-;; system statuses are stored in `symon--statuses', as a list of
+;; system statuses are stored in `symon--statuses', as an alist of
 ;; rings.
 
 (defvar symon--statuses nil)
