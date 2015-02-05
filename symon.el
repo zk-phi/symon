@@ -114,12 +114,10 @@ BEFORE enabling `symon-mode'.*"
 ;; Emacs to stop fetching. DISPLAY-FN is called just before displaying
 ;; monitor, and must return display string for the monitor.
 
-(defconst symon--default-update-interval 3)
-
 (defmacro define-symon-monitor (name &rest plist)
   (let* ((cell (make-vector 2 nil))
          (history (plist-get plist :history))
-         (interval (or (plist-get plist :interval) symon--default-update-interval))
+         (interval (or (plist-get plist :interval) 'symon-refresh-rate))
          (display (plist-get plist :display))
          (update-fn
           `(lambda ()
