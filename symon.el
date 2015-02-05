@@ -102,9 +102,9 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
-(defun symon--make-ring (size)
+(defun symon--make-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
-  (cons 0 (cons size (make-vector size nil))))
+  (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
 (defun symon--file-contents (file)
   (with-temp-buffer (insert-file-contents file) (buffer-string)))
@@ -128,7 +128,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
              (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
          (setup-fn
           `(lambda ()
-             (aset ,cell 0 (symon--make-ring symon-history-size))
+             (aset ,cell 0 (symon--make-ring))
              (aset ,cell 1 (run-with-timer 0 ,interval ,update-fn))
              ,(plist-get plist :setup)
              (funcall ,update-fn)))
