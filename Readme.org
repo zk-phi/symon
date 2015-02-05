@@ -11,34 +11,51 @@ tiny graphical system monitor
 ** NOTE: RECENT VISIBLE CHANGES
 
 - =symon-initialize= is now obsolete (use =symon-mode= instead)
+- =symon-fetcher= is now obsolete (use =symon-monitors= instead)
+- =symon-history-size= is now obsolete
 
 ** Usage
 
-Load this script
+Load =symon=
 
 : (require 'symon)
 
-and activate.
+and turn on =symon-mode=.
 
 : (symon-mode)
 
 then a tiny system monitor is displayed in minibuffer, during idle.
 
-** Supported Systems / Provided Informations
+** Customization
 
-- Linux
-  - memory usage (%), swapped memory (MB) via =/proc/meminfo=
-  - CPU load (%) via =/proc/stat=
-  - remaining battery (%) via built-in library =battery.el=
+- =symon-monitors= :: List of symon monitors used to fetch system
+     statuses. You can set this variable to specify what metrics to
+     display and what to not. List of available monitors is provided
+     below.
 
-- Windows (XP or later)
-  - memory usage (%), pagefile usage (MB), remaining battery (%) via
-    =powershell= (=WMI=)
-  - CPU load (%) via =typeperf=
+- =symon-refresh-rate= :: Refresh rate of symon display.
 
-other systems are unsupported for now (contributions are welcome!).
+- =symon-delay= :: Delay in seconds until symon is displayed.
 
-network informations are probably added someday.
+You need to setup all these 3 variables before activating
+=symon-mode=.
+
+- =symon-sparkline-size= :: =(WIDTH . HEIGHT)= of sparkline.
+
+** Provided Monitors
+
+- GNU/Linux
+  - =symon-linux-memory-monitor= via =/proc/meminfo=
+  - =symon-linux-cpu-monitor= via =/proc/stat=
+  - =symon-linux-battery-monitor= via built-in library =battery.el=
+
+- Windows
+  - =symon-windows-memory-monitor= via =WMI=
+  - =symon-windows-cpu-monitor= via =typeperf=
+  - =symon-windows-battery-monitor= via =WMI=
+
+- misc
+  - =symon-current-time-monitor=
 
 ** NOTE
 
