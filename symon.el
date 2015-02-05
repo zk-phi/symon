@@ -37,7 +37,6 @@
 ;;; Code:
 
 (require 'ring)
-(require 'battery)
 
 (defconst symon-version "1.0.0beta")
 
@@ -206,46 +205,46 @@ BEFORE enabling `symon-mode'.*"
 
 (define-symon-monitor symon-linux-cpu-monitor
   :index "CPU:" :unit "%" :history 50
-  :setup   (setq symon-linux--last-cpu-ticks nil)
-  :fetch   (let* ((str (symon--file-contents "/proc/stat"))
-                  (_ (string-match "^cpu\\_>\\(.*\\)$" str))
-                  (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
-                  (total (apply '+ lst))
-                  (idle (nth 3 lst)))
-             (prog1 (when symon-linux--last-cpu-ticks
-                      (let ((total-diff (- total (car symon-linux--last-cpu-ticks)))
-                            (idle-diff (- idle (cdr symon-linux--last-cpu-ticks))))
-                        (/ (* (- total-diff idle-diff) 100) total-diff)))
-               (setq symon-linux--last-cpu-ticks (cons total idle)))))
+  :setup (setq symon-linux--last-cpu-ticks nil)
+  :fetch (let* ((str (symon--file-contents "/proc/stat"))
+                (_ (string-match "^cpu\\_>\\(.*\\)$" str))
+                (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
+                (total (apply '+ lst))
+                (idle (nth 3 lst)))
+           (prog1 (when symon-linux--last-cpu-ticks
+                    (let ((total-diff (- total (car symon-linux--last-cpu-ticks)))
+                          (idle-diff (- idle (cdr symon-linux--last-cpu-ticks))))
+                      (/ (* (- total-diff idle-diff) 100) total-diff)))
+             (setq symon-linux--last-cpu-ticks (cons total idle)))))
 
 (define-symon-monitor symon-linux-memory-monitor
   :index "MEM:" :unit "%" :history 50
-  :fetch      (let* ((str (symon--file-contents "/proc/meminfo"))
-                     (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
-                     (swaptotal (read (match-string 1 str)))
-                     (_ (string-match "^SwapFree:[\s\t]*\\([0-9]+\\)\\>" str))
-                     (swapfree (read (match-string 1 str)))
-                     (_ (string-match "^MemTotal:[\s\t]*\\([0-9]+\\)\\>" str))
-                     (memtotal (read (match-string 1 str))))
-                (setq symon-linux--swapped-meomry (/ (- swaptotal swapfree) 1000))
-                (if (string-match "^MemAvailable:[\s\t]*\\([0-9]+\\)\\>" str)
-                    (/ (* (- memtotal (read (match-string 1 str))) 100) memtotal)
-                  (let* ((_ (string-match "^MemFree:[\s\t]*\\([0-9]+\\)\\>" str))
-                         (memfree (read (match-string 1 str)))
-                         (_ (string-match "^Buffers:[\s\t]*\\([0-9]+\\)\\>" str))
-                         (buffers (read (match-string 1 str)))
-                         (_ (string-match "^Cached:[\s\t]*\\([0-9]+\\)\\>" str))
-                         (cached (read (match-string 1 str))))
-                    (/ (* (- memtotal (+ memfree buffers cached)) 100) memtotal))))
+  :fetch (let* ((str (symon--file-contents "/proc/meminfo"))
+                (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+                (swaptotal (read (match-string 1 str)))
+                (_ (string-match "^SwapFree:[\s\t]*\\([0-9]+\\)\\>" str))
+                (swapfree (read (match-string 1 str)))
+                (_ (string-match "^MemTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+                (memtotal (read (match-string 1 str))))
+           (setq symon-linux--swapped-meomry (/ (- swaptotal swapfree) 1000))
+           (if (string-match "^MemAvailable:[\s\t]*\\([0-9]+\\)\\>" str)
+               (/ (* (- memtotal (read (match-string 1 str))) 100) memtotal)
+             (let* ((_ (string-match "^MemFree:[\s\t]*\\([0-9]+\\)\\>" str))
+                    (memfree (read (match-string 1 str)))
+                    (_ (string-match "^Buffers:[\s\t]*\\([0-9]+\\)\\>" str))
+                    (buffers (read (match-string 1 str)))
+                    (_ (string-match "^Cached:[\s\t]*\\([0-9]+\\)\\>" str))
+                    (cached (read (match-string 1 str))))
+               (/ (* (- memtotal (+ memfree buffers cached)) 100) memtotal))))
   :annotation (when (and symon-linux--swapped-meomry
                          (not (zerop symon-linux--swapped-meomry)))
                 (format "%dMB Swapped" symon-linux--swapped-meomry)))
 
 (define-symon-monitor symon-linux-battery-monitor
   :index "BAT:" :unit "%" :history 50
-  :setup   (require 'battery)
-  :fetch   (when battery-status-function
-             (read (cdr (assoc ?p (funcall battery-status-function))))))
+  :setup (require 'battery)
+  :fetch (when battery-status-function
+           (read (cdr (assoc ?p (funcall battery-status-function))))))
 
 ;; + windows monitors
 
