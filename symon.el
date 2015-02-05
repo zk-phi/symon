@@ -19,14 +19,15 @@
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
 ;; Version: 1.0.0beta
+;; Package-Requires: ((cl-lib "0.5"))
 
 ;;; Commentary:
 
-;; Load either `symon-linux' or `symon-windows'
+;; Load this script
 ;;
-;;   (require 'symon-linux)
+;;   (require 'symon)
 ;;
-;; and turn on `symon-mode'.
+;; and activate.
 ;;
 ;;   (symon-mode)
 ;;
@@ -37,6 +38,8 @@
 ;;; Code:
 
 (require 'ring)
+(require 'cl-lib)
+(require 'battery)
 
 (defconst symon-version "1.0.0beta")
 
@@ -46,9 +49,14 @@
 
 ;; + customs
 
+(defcustom symon-history-size 50
+  "number of old values to keep. sparklines grow faster when set
+smaller. *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
 (defcustom symon-refresh-rate 3
-  "refresh rate of symon display. *set this option BEFORE
-  enabling `symon-mode'.*"
+  "refresh rate of status values in seconds. *set this option
+  BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
 (defcustom symon-delay 2
@@ -56,15 +64,25 @@
 BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
-(defcustom symon-monitors nil
-  "list of monitors used to read system statuses. *set this
-  option BEFORE enabling `symon-mode'.*")
+(defcustom symon-fetcher
+  (cl-case system-type
+    ((windows-nt) 'symon-default-windows-fetcher)
+    ((gnu/linux cygwin) 'symon-default-linux-fetcher))
+  "fetcher to read system statuses. you can use preconfigured
+  fetcher `symon-default-linux-fetcher' or
+  `symon-default-windows-fetcher', or implement your own with
+  `define-symon-fetcher'. *set this option BEFORE enabling
+  `symon-mode'.*"
+  :group 'symon)
 
 (defcustom symon-sparkline-size '(80 . 11)
   "(WIDTH . HEIGHT) of sparkline."
   :group 'symon)
 
 ;; + utilities
+
+(defun symon--file-contents (file)
+  (with-temp-buffer (insert-file-contents file) (buffer-string)))
 
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
@@ -89,67 +107,171 @@ BEFORE enabling `symon-mode'.*"
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
-(defun symon--make-ring (size)
+;; + status rings
+
+;; system statuses are stored in `symon--statuses', as an alist of
+;; rings.
+
+(defvar symon--statuses nil)
+
+(defun symon--make-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
-  (cons 0 (cons size (make-vector size nil))))
+  (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
+
+(defun symon-commit-status (status value)
+  "push a status value VALUE for STATUS."
+  (let ((ring (cdr (assq status symon--statuses))))
+    (unless ring
+      (setq ring (symon--make-ring))
+      (push (cons status ring) symon--statuses))
+    (ring-insert ring value)))
+
+(defun symon--status-history (status)
+  "get a list of recent status values for STATUS."
+  (let ((ring (cdr (assq status symon--statuses))))
+    (when ring (ring-elements ring))))
 
 ;; + symon fetcher
 
-(defconst symon--default-update-interval 3)
+;; a symon fetcher is a vector of [SETUP-FN CLEANUP-FN]. each FN is a
+;; function which takes no arguments. SETUP-FN is called on activation
+;; of `symon-mode', and should set up emacs properly to commit status
+;; values via `symon-commit-status' every `symon-refresh-rate'
+;; seconds. CLEANUP-FN is called on deactivation of `symon-mode' and
+;; expected to do some clean-ups to stop reporting status values.
 
-;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
-;; DISPLAY-FN]. SETUP-FN is called on activation of `symon-mode', and
-;; expected to setup Emacs to fetch status values in a specific
-;; interval. CLEANUP-FN is called on deactivation and expected to tell
-;; Emacs to stop fetching. DISPLAY-FN is called just before displaying
-;; monitor, and must return display string for the monitor.
+(defmacro define-symon-fetcher (name &rest plist)
+  `(put ',name 'symon-fetcher
+        (vector (lambda () ,(plist-get plist :setup))
+                (lambda () ,(plist-get plist :cleanup)))))
 
-(defmacro define-symon-monitor (name &rest plist)
-  (let* ((cell (make-vector 2 nil))
-         (history (plist-get plist :history))
-         (interval (or (plist-get plist :interval) symon--default-update-interval))
-         (display (plist-get plist :display))
-         (update-fn
-          `(lambda ()
-             (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
-         (setup-fn
-          `(lambda ()
-             (aset ,cell 0 (symon--make-ring (1+ (or ,history 0))))
-             (aset ,cell 1 (run-with-timer 0 ,interval ,update-fn))
-             ,(plist-get plist :setup)
-             (funcall ,update-fn)))
-         (cleanup-fn
-          `(lambda ()
-             (cancel-timer (aref ,cell 1))
-             ,(plist-get plist :cleanup)))
-         (display-fn
-          (if display `(lambda () (concat ,display " "))
-            `(lambda ()
-               (or ,(plist-get plist :display)
-                   (let* ((lst (ring-elements (aref ,cell 0)))
-                          (val (car lst)))
-                     (concat ,(plist-get plist :index)
-                             (if (not (numberp val)) "N/A "
-                               (concat (number-to-string val)
-                                       ,(plist-get plist :unit) " "
-                                       (let ((annot ,(plist-get plist :annotation)))
-                                         (when annot (concat "(" annot ") ")))))
-                             ,(when history
-                                `(when (window-system)
-                                   (concat (propertize " " 'display
-                                                       (symon--make-sparkline
-                                                        lst
-                                                        ,(plist-get plist :lower-bound)
-                                                        ,(plist-get plist :upper-bound)))
-                                           " "))))))))))
-    `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
+;; linux fetcher
+
+(defvar symon--default-linux-last-cpu-ticks nil)
+(defvar symon--default-linux-timer-object nil)
+
+(define-symon-fetcher symon-default-linux-fetcher
+  :setup (setq symon--default-linux-last-cpu-ticks nil
+               symon--default-linux-timer-object
+               (run-with-timer 0 symon-refresh-rate 'symon--default-linux-update-function))
+  :cleanup (cancel-timer symon--default-linux-timer-object))
+
+(defun symon--default-linux-update-function ()
+  ;; CPU
+  (if (file-exists-p "/proc/stat")
+      (let* ((str (symon--file-contents "/proc/stat"))
+             (_ (string-match "^cpu\\_>\\(.*\\)$" str))
+             (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
+             (total (apply '+ lst))
+             (idle (nth 3 lst)))
+        (if symon--default-linux-last-cpu-ticks
+            (let ((total-diff (- total (car symon--default-linux-last-cpu-ticks)))
+                  (idle-diff (- idle (cdr symon--default-linux-last-cpu-ticks))))
+              (symon-commit-status 'cpu (/ (* (- total-diff idle-diff) 100) total-diff)))
+          (symon-commit-status 'cpu nil))
+        (setq symon--default-linux-last-cpu-ticks (cons total idle)))
+    (symon-commit-status 'cpu nil))
+  ;; Memory / Swap
+  (if (file-exists-p "/proc/meminfo")
+      (let* ((str (symon--file-contents "/proc/meminfo"))
+             (_ (string-match "^MemTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+             (memtotal (read (match-string 1 str)))
+             (_ (string-match "^MemFree:[\s\t]*\\([0-9]+\\)\\>" str))
+             (memfree (read (match-string 1 str)))
+             (_ (string-match "^Buffers:[\s\t]*\\([0-9]+\\)\\>" str))
+             (buffers (read (match-string 1 str)))
+             (_ (string-match "^Cached:[\s\t]*\\([0-9]+\\)\\>" str))
+             (cached (read (match-string 1 str)))
+             (freetotal (if (string-match "^MemAvailable:[\s\t]*\\([0-9]+\\)\\>" str)
+                            (read (match-string 1 str))
+                          (+ memfree (+ buffers cached))))
+             (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
+             (swaptotal (read (match-string 1 str)))
+             (_ (string-match "^SwapFree:[\s\t]*\\([0-9]+\\)\\>" str))
+             (swapfree (read (match-string 1 str))))
+        (symon-commit-status 'memory (/ (* (- memtotal freetotal) 100) memtotal))
+        (symon-commit-status 'swap (/ (- swaptotal swapfree) 1000)))
+    (symon-commit-status 'memory nil)
+    (symon-commit-status 'swap nil))
+  ;; Battery
+  (symon-commit-status 'battery
+                       (when battery-status-function
+                         (read (cdr (assoc ?p (funcall battery-status-function)))))))
+
+;; windows fetcher
+
+(defvar symon--default-windows-timer-object nil)
+
+(defconst symon--powershell-wmi-command
+  (concat "echo ----;"
+          "(gwmi Win32_ComputerSystem).TotalPhysicalMemory;"
+          "(gwmi Win32_OperatingSystem).FreePhysicalMemory;"
+          "(gwmi Win32_Battery).EstimatedChargeRemaining;"
+          "(gwmi Win32_PageFileUsage).CurrentUsage"))
+
+(define-symon-fetcher symon-default-windows-fetcher
+  :setup (progn
+           (set-process-query-on-exit-flag
+            (start-process-shell-command
+             "symon-typeperf" " *symon-typeperf*"
+             (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
+                     symon-refresh-rate)) nil)
+           (with-current-buffer (get-buffer-create " *symon-wmi*")
+             (insert
+              (shell-command-to-string
+               (concat "powershell -command " symon--powershell-wmi-command))))
+           (set-process-query-on-exit-flag
+            (start-process-shell-command
+             "symon-wmi" " *symon-wmi*"
+             (format "powershell -command while(1) {sleep %d;%s}"
+                     symon-refresh-rate
+                     symon--powershell-wmi-command)) nil)
+           (setq symon--default-windows-timer-object
+                 (run-with-timer 0 symon-refresh-rate
+                                 'symon--default-windows-update-function)))
+  :cleanup (progn
+             (cancel-timer symon--default-windows-timer-object)
+             (kill-buffer " *symon-typeperf*")
+             (kill-buffer " *symon-wmi*")))
+
+(defun symon--default-windows-update-function ()
+  ;; typeperf (CPU)
+  (if (buffer-live-p (get-buffer " *symon-typeperf*"))
+      (with-current-buffer " *symon-typeperf*"
+        (save-excursion
+          (cond ((search-backward-regexp "\",\"\\(.*\\)\"" nil t)
+                 (symon-commit-status 'cpu (round (read (match-string 1))))
+                 (delete-region (point-min) (point)))
+                (t
+                 (symon-commit-status 'cpu nil)))))
+    (symon-commit-status 'cpu nil))
+  ;; wmic (Memory / Swap, Battery)
+  (if (buffer-live-p (get-buffer " *symon-wmi*"))
+      (with-current-buffer " *symon-wmi*"
+        (save-excursion
+          (cond ((search-backward "----" nil t)
+                 (delete-region (point-min) (point))
+                 (let (memtotal memfree battery swap)
+                   (dolist (var '(memtotal memfree battery swap))
+                     (search-forward-regexp "^[0-9]+\\>")
+                     (set var (read (match-string 0))))
+                   (setq memtotal (floor (/ memtotal 1000))) ; Bytes -> KBytes
+                   (symon-commit-status 'memory  (/ (* (- memtotal memfree) 100) memtotal))
+                   (symon-commit-status 'swap    swap)
+                   (symon-commit-status 'battery battery)))
+                (t
+                 (symon-commit-status 'memory  nil)
+                 (symon-commit-status 'swap    nil)
+                 (symon-commit-status 'battery nil)))))
+    (symon-commit-status 'memory  nil)
+    (symon-commit-status 'swap    nil)
+    (symon-commit-status 'battery nil)))
 
 ;; + symon core
 
-(defvar symon--cleanup-fns    nil)
-(defvar symon--display-fns    nil)
+(defvar symon--cleanup-function nil)
 (defvar symon--display-active nil)
-(defvar symon--timer-objects  nil)
+(defvar symon--timer-objects nil)
 
 ;;;###autoload
 (define-minor-mode symon-mode
@@ -157,42 +279,53 @@ BEFORE enabling `symon-mode'.*"
   :init-value nil
   :global t
   (cond (symon-mode
-         (unless symon-monitors
-           (message "Warning: `symon-monitors' is empty."))
-         (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
-           (mapc (lambda (m) (funcall (aref m 0))) monitors)
-           (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
-                 symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
-                 symon--display-active nil
-                 symon--timer-objects
-                 (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
-                       (run-with-idle-timer symon-delay t 'symon-display)))
-           (add-hook 'pre-command-hook 'symon--display-end)))
+         (setq symon--statuses nil)
+         (if (null symon-fetcher)
+             (error "`symon-fetcher' is not set.")
+           (let ((vec (get symon-fetcher 'symon-fetcher)))
+             (funcall (aref vec 0))
+             (setq symon--cleanup-function (aref vec 1))))
+         (setq symon--timer-objects
+               (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
+                     (run-with-idle-timer symon-delay t 'symon--display)))
+         (add-hook 'pre-command-hook 'symon-display-end))
         (t
-         (remove-hook 'pre-command-hook 'symon--display-end)
+         (remove-hook 'pre-command-hook 'symon-display-end)
          (mapc 'cancel-timer symon--timer-objects)
-         (mapc 'funcall symon--cleanup-fns))))
+         (funcall symon--cleanup-function))))
 
-(defun symon-display ()
+(defun symon--display ()
   "activate symon display."
   (interactive)
   (unless (active-minibuffer-window)
-    (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
-      (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
+    (let* ((memory-lst (symon--status-history 'memory))
+           (memory (car memory-lst))
+           (swap-lst (symon--status-history 'swap))
+           (swap (car swap-lst))
+           (cpu-lst (symon--status-history 'cpu))
+           (cpu (car cpu-lst))
+           (battery-lst (symon--status-history 'battery))
+           (battery (car battery-lst))
+           (message-log-max nil))   ; do not insert to *Messages* buffer
+      (message
+       (concat "MEM:" (if (not (numberp memory)) "N/A " (format "%2d%%%% " memory))
+               (when (and (numberp swap) (> swap 0)) (format "(%dMB Swapped) " swap))
+               (propertize " " 'display (symon--make-sparkline memory-lst)) " "
+               "CPU:" (if (not (numberp cpu)) "N/A " (format "%2d%%%% " cpu))
+               (propertize " " 'display (symon--make-sparkline cpu-lst)) " "
+               "BAT:" (if (not (numberp battery)) "N/A " (format "%d%%%% " battery))
+               (propertize " " 'display (symon--make-sparkline battery-lst)))))
     (setq symon--display-active t)))
 
 (defun symon--redisplay ()
   "update symon display."
-  (when symon--display-active (symon-display)))
+  (when symon--display-active (symon--display)))
 
-(defun symon--display-end ()
+(defun symon-display-end ()
   "deactivate symon display."
   (setq symon--display-active nil))
 
-;; + backward compatibility
-
-(defvar symon-fetcher)
-(make-obsolete-variable 'symon-fetcher 'symon-monitors "2015/02/05")
+(define-obsolete-function-alias 'symon-initialize 'symon-mode "1/30/2015")
 
 ;; + provide
 
