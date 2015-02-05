@@ -47,17 +47,29 @@ You need to setup all these 4 variables before activating
 ** Provided Monitors
 
 - GNU/Linux
-  - =symon-linux-memory-monitor= via =/proc/meminfo=
-  - =symon-linux-cpu-monitor= via =/proc/stat=
-  - =symon-linux-battery-monitor= via built-in library =battery.el=
+
+  - =symon-linux-memory-monitor= :: memory usage (%) and swapped
+       memory (MB) via =/proc/meminfo=
+
+  - =symon-linux-cpu-monitor= :: CPU load (%) via =/proc/stat=
+
+  - =symon-linux-battery-monitor= :: remaining battery (%) via
+       built-in library =battery.el=
 
 - Windows
-  - =symon-windows-memory-monitor= via =WMI=
-  - =symon-windows-cpu-monitor= via =typeperf=
-  - =symon-windows-battery-monitor= via =WMI=
+
+  - =symon-windows-memory-monitor= :: memory usage (%) and page file
+       usage (MB) via =WMI=
+
+  - =symon-windows-cpu-monitor= :: CPU load (%) via =typeperf=
+
+  - =symon-windows-battery-monitor= :: remaining battery (%) via =WMI=
 
 - misc
-  - =symon-current-time-monitor=
+
+  - =symon-current-time-monitor= :: current Time (hh::mm)
+
+  - =symon-file-system-monitor= :: disc usage (%)
 
 ** NOTE
 

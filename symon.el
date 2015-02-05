@@ -139,23 +139,21 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
          (display-fn
           (if display `(lambda () (concat ,display " "))
             `(lambda ()
-               (or ,(plist-get plist :display)
-                   (let* ((lst (ring-elements (aref ,cell 0)))
-                          (val (car lst)))
-                     (concat ,(plist-get plist :index)
-                             (if (not (numberp val)) "N/A "
-                               (concat (number-to-string val)
-                                       ,(plist-get plist :unit) " "
-                                       (let ((annot ,(plist-get plist :annotation)))
-                                         (when annot (concat "(" annot ") ")))))
-                             ,(when sparkline
-                                `(when (window-system)
-                                   (concat (propertize " " 'display
-                                                       (symon--make-sparkline
-                                                        lst
-                                                        ,(plist-get plist :lower-bound)
-                                                        ,(plist-get plist :upper-bound)))
-                                           " "))))))))))
+               (let* ((lst (ring-elements (aref ,cell 0)))
+                      (val (car lst)))
+                 (concat ,(plist-get plist :index)
+                         (if (not (numberp val)) "N/A "
+                           (concat (format "%d%s " val ,(plist-get plist :unit))
+                                   (let ((annot ,(plist-get plist :annotation)))
+                                     (when annot (concat "(" annot ") ")))))
+                         ,(when sparkline
+                            `(when (window-system)
+                               (concat (propertize " " 'display
+                                                   (symon--make-sparkline
+                                                    lst
+                                                    ,(plist-get plist :lower-bound)
+                                                    ,(plist-get plist :upper-bound)))
+                                       " ")))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
 ;; + symon core
@@ -315,6 +313,12 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                  (delete-region (point-min) (match-beginning 0)))))))
 
 ;; + misc monitors
+
+(define-symon-monitor symon-file-system-monitor
+  :index "DISC:" :unit "%" :sparkline t
+  :fetch (let ((info (file-system-info default-directory)))
+           (when info
+             (/ (- (car info) (cadr info)) (/ (car info) 100)))))
 
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))
