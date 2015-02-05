@@ -12,7 +12,6 @@ tiny graphical system monitor
 
 - =symon-initialize= is now obsolete (use =symon-mode= instead)
 - =symon-fetcher= is now obsolete (use =symon-monitors= instead)
-- =symon-history-size= is now obsolete
 
 ** Usage
 

@@ -56,6 +56,11 @@
 BEFORE enabling `symon-mode'.*"
   :group 'symon)
 
+(defcustom symon-history-size 50
+  "number of old values to keep. sparklines grow faster when set
+smaller. *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
 (defcustom symon-monitors
   (cond ((memq system-type '(gnu/linux cygwin))
          '(symon-linux-memory-monitor
@@ -115,7 +120,7 @@ BEFORE enabling `symon-mode'.*"
 
 (defmacro define-symon-monitor (name &rest plist)
   (let* ((cell (make-vector 2 nil))
-         (history (plist-get plist :history))
+         (sparkline (plist-get plist :sparkline))
          (interval (or (plist-get plist :interval) 'symon-refresh-rate))
          (display (plist-get plist :display))
          (update-fn
@@ -123,7 +128,7 @@ BEFORE enabling `symon-mode'.*"
              (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
          (setup-fn
           `(lambda ()
-             (aset ,cell 0 (symon--make-ring (1+ (or ,history 0))))
+             (aset ,cell 0 (symon--make-ring symon-history-size))
              (aset ,cell 1 (run-with-timer 0 ,interval ,update-fn))
              ,(plist-get plist :setup)
              (funcall ,update-fn)))
@@ -143,7 +148,7 @@ BEFORE enabling `symon-mode'.*"
                                        ,(plist-get plist :unit) " "
                                        (let ((annot ,(plist-get plist :annotation)))
                                          (when annot (concat "(" annot ") ")))))
-                             ,(when history
+                             ,(when sparkline
                                 `(when (window-system)
                                    (concat (propertize " " 'display
                                                        (symon--make-sparkline
@@ -204,7 +209,7 @@ BEFORE enabling `symon-mode'.*"
 (defvar symon-linux--swapped-meomry nil)
 
 (define-symon-monitor symon-linux-cpu-monitor
-  :index "CPU:" :unit "%" :history 50
+  :index "CPU:" :unit "%" :sparkline t
   :setup (setq symon-linux--last-cpu-ticks nil)
   :fetch (let* ((str (symon--file-contents "/proc/stat"))
                 (_ (string-match "^cpu\\_>\\(.*\\)$" str))
@@ -218,7 +223,7 @@ BEFORE enabling `symon-mode'.*"
              (setq symon-linux--last-cpu-ticks (cons total idle)))))
 
 (define-symon-monitor symon-linux-memory-monitor
-  :index "MEM:" :unit "%" :history 50
+  :index "MEM:" :unit "%" :sparkline t
   :fetch (let* ((str (symon--file-contents "/proc/meminfo"))
                 (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
                 (swaptotal (read (match-string 1 str)))
@@ -241,7 +246,7 @@ BEFORE enabling `symon-mode'.*"
                 (format "%dMB Swapped" symon-linux--swapped-meomry)))
 
 (define-symon-monitor symon-linux-battery-monitor
-  :index "BAT:" :unit "%" :history 50
+  :index "BAT:" :unit "%" :sparkline t
   :setup (require 'battery)
   :fetch (when battery-status-function
            (read (cdr (assoc ?p (funcall battery-status-function))))))
@@ -251,7 +256,7 @@ BEFORE enabling `symon-mode'.*"
 (defvar symon-windows--swapped-memory nil)
 
 (define-symon-monitor symon-windows-cpu-monitor
-  :index "CPU:" :unit "%" :history 50
+  :index "CPU:" :unit "%" :sparkline t
   :setup (set-process-query-on-exit-flag
           (start-process-shell-command
            "symon-typeperf" " *symon-typeperf*"
@@ -265,7 +270,7 @@ BEFORE enabling `symon-mode'.*"
                (delete-region (point-min) (match-beginning 0))))))
 
 (define-symon-monitor symon-windows-memory-monitor
-  :index "MEM:" :unit "%" :history 50
+  :index "MEM:" :unit "%" :sparkline t
   :setup (progn
            (setq symon-windows--swapped-memory nil)
            (set-process-query-on-exit-flag
@@ -294,7 +299,7 @@ BEFORE enabling `symon-mode'.*"
                 (format "%dMB Swapped" symon-windows--swapped-memory)))
 
 (define-symon-monitor symon-windows-battery-monitor
-  :index "BAT:" :unit "%" :history 50
+  :index "BAT:" :unit "%" :sparkline t
   :setup (set-process-query-on-exit-flag
           (start-process-shell-command
            "symon-wmi-battery" " *symon-wmi-battery*"
