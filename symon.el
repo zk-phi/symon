@@ -315,7 +315,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; + misc monitors
 
 (define-symon-monitor symon-file-system-monitor
-  :index "DISC:" :unit "%" :sparkline t
+  :index "DISK:" :unit "%" :sparkline t
   :fetch (let ((info (file-system-info default-directory)))
            (when info
              (/ (- (car info) (cadr info)) (/ (car info) 100)))))
