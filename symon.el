@@ -204,7 +204,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; + linux monitors
 
 (defvar symon-linux--last-cpu-ticks nil)
-(defvar symon-linux--swapped-meomry nil)
 
 (define-symon-monitor symon-linux-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
@@ -219,6 +218,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                           (idle-diff (- idle (cdr symon-linux--last-cpu-ticks))))
                       (/ (* (- total-diff idle-diff) 100) total-diff)))
              (setq symon-linux--last-cpu-ticks (cons total idle)))))
+
+(defvar symon-linux--swapped-meomry nil)
 
 (define-symon-monitor symon-linux-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
@@ -251,77 +252,98 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 ;; + windows monitors
 
-(defvar symon-windows--swapped-memory nil)
+(defvar symon-windows--wmi-process-reference-count 0)
+
+(defun symon-windows--maybe-start-wmi-process ()
+  (setq symon-windows--wmi-process-reference-count
+        (1+ symon-windows--wmi-process-reference-count))
+  (unless (buffer-live-p (get-buffer " *symon-wmi*"))
+    (let ((proc (start-process-shell-command
+                 "symon-wmi" " *symon-wmi*"
+                 (format
+                  (concat "powershell -command while(1) {"
+                          "echo ----;"
+                          ;; memory usage
+                          "$t = (gwmi Win32_ComputerSystem).TotalPhysicalMemory / 1000;"
+                          "$f = (gwmi Win32_OperatingSystem).FreePhysicalMemory;"
+                          "echo mem:$(($t - $f) * 100 / $t);"
+                          ;; page file usage
+                          "echo swap:$((gwmi Win32_PageFileUsage).CurrentUsage);"
+                          ;; cpu load
+                          "$w = gwmi Win32_PerfFormattedData_Counters_ProcessorInformation;"
+                          "echo cpu:$($w.get(0).PercentProcessorTime);"
+                          ;; battery
+                          "echo bat:$((gwmi Win32_Battery).EstimatedChargeRemaining);"
+                          ;; rx/tx
+                          "$r = 0; $t = 0;"
+                          "$w = gwmi Win32_PerfFormattedData_Tcpip_NetworkInterface;"
+                          "foreach($x in $w){"
+                          "$r = $r + $x.BytesReceivedPersec;"
+                          "$t = $t + $x.BytesSentPersec }"
+                          "echo rx:$r;"
+                          "echo tx:$t;"
+                          ;; loop
+                          "sleep %d }") symon-refresh-rate)))
+          (filter (lambda (_ str)
+                    (with-current-buffer " *symon-wmi*"
+                      (when (and (save-match-data (string-match "-" str))
+                                 (search-backward "----" nil t))
+                        (delete-region 1 (point)))
+                      (goto-char (1+ (buffer-size)))
+                      (insert str)))))
+      (set-process-query-on-exit-flag proc nil)
+      (set-process-filter proc filter))))
+
+(defun symon-windows--maybe-kill-wmi-process ()
+  (setq symon-windows--wmi-process-reference-count
+        (1- symon-windows--wmi-process-reference-count))
+  (when (and (zerop symon-windows--wmi-process-reference-count)
+             (buffer-live-p (get-buffer " *symon-wmi*")))
+    (kill-process (get-buffer-process " *symon-wmi*"))
+    (kill-buffer " *symon-wmi*")))
 
 (define-symon-monitor symon-windows-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
-  :setup (set-process-query-on-exit-flag
-          (start-process-shell-command
-           "symon-typeperf" " *symon-typeperf*"
-           (format "typeperf -si %d \"\\Processor(_Total)\\%% Processor Time\""
-                   symon-refresh-rate)) nil)
-  :cleanup (kill-buffer " *symon-typeperf*")
-  :fetch (with-current-buffer " *symon-typeperf*"
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (with-current-buffer " *symon-wmi*"
            (when (save-excursion
-                   (search-backward-regexp "\",\"\\(.*\\)\"" nil t))
-             (prog1 (round (read (match-string 1)))
-               (delete-region (point-min) (match-beginning 0))))))
+                   (search-backward-regexp "cpu:\\([0-9]+\\)\\>" nil t))
+             (read (match-string 1)))))
 
 (define-symon-monitor symon-windows-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
-  :setup (progn
-           (setq symon-windows--swapped-memory nil)
-           (set-process-query-on-exit-flag
-            (start-process-shell-command
-             "symon-wmi-memory" " *symon-wmi-memory*"
-             (format (concat "powershell -command while(1) {"
-                             "echo ----;"
-                             "(gwmi Win32_ComputerSystem).TotalPhysicalMemory;"
-                             "(gwmi Win32_OperatingSystem).FreePhysicalMemory;"
-                             "(gwmi Win32_PageFileUsage).CurrentUsage;"
-                             "sleep %d;"
-                             "}") symon-refresh-rate)) nil))
-  :cleanup (kill-buffer " *symon-wmi-memory*")
-  :fetch (with-current-buffer " *symon-wmi-memory*"
-           (save-excursion
-             (when (search-backward "----" nil t)
-               (goto-char (match-end 0))
-               (delete-region (point-min) (match-beginning 0))
-               (let ((memtotal (floor (/ (read (current-buffer)) 1000)))
-                     (memfree (read (current-buffer)))
-                     (swap (read (current-buffer))))
-                 (setq symon-windows--swapped-memory swap)
-                 (/ (* (- memtotal memfree) 100) memtotal)))))
-  :annotation (when (and symon-windows--swapped-memory
-                         (not (zerop symon-windows--swapped-memory)))
-                (format "%dMB Swapped" symon-windows--swapped-memory)))
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (with-current-buffer " *symon-wmi*"
+           (when (save-excursion
+                   (search-backward-regexp "mem:\\([0-9]+\\)\\>" nil t))
+             (read (match-string 1))))
+  :annotation (with-current-buffer " *symon-wmi*"
+                (when (save-excursion
+                        (search-backward-regexp "swap:\\([0-9]+\\)\\>" nil t))
+                  (let ((swapped (read (match-string 1))))
+                    (unless (zerop swapped) (format "%dMB Swapped" swapped))))))
 
 (define-symon-monitor symon-windows-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
-  :setup (set-process-query-on-exit-flag
-          (start-process-shell-command
-           "symon-wmi-battery" " *symon-wmi-battery*"
-           (format (concat "powershell -command while(1) {"
-                           "(gwmi Win32_Battery).EstimatedChargeRemaining;"
-                           "sleep %d;"
-                           "}") symon-refresh-rate)) nil)
-  :cleanup (kill-buffer " *symon-wmi-battery*")
-  :fetch (with-current-buffer " *symon-wmi-battery*"
-           (save-excursion
-             (when (search-backward-regexp "^[0-9]+\\>" nil t)
-               (prog1 (read (match-string 0))
-                 (delete-region (point-min) (match-beginning 0)))))))
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (with-current-buffer " *symon-wmi*"
+           (when (save-excursion
+                   (search-backward-regexp "bat:\\([0-9]+\\)\\>" nil t))
+             (read (match-string 1)))))
 
 ;; + misc monitors
+
+(define-symon-monitor symon-current-time-monitor
+  :display (format-time-string "%H:%M"))
 
 (define-symon-monitor symon-file-system-monitor
   :index "DISK:" :unit "%" :sparkline t
   :fetch (let ((info (file-system-info default-directory)))
            (when info
              (/ (- (car info) (cadr info)) (/ (car info) 100)))))
-
-(define-symon-monitor symon-current-time-monitor
-  :display (format-time-string "%H:%M"))
 
 ;; + provide
 
