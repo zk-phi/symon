@@ -36,6 +36,7 @@
 
 ;;; Code:
 
+(require 'battery)
 (require 'ring)
 
 (defconst symon-version "1.0.0beta")
@@ -77,6 +78,14 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "(WIDTH . HEIGHT) of sparkline."
   :group 'symon)
 
+(defcustom symon-network-rx-upper-bound 150
+  "upper-bound of sparkline for network RX status."
+  :group 'symon)
+
+(defcustom symon-network-tx-upper-bound 50
+  "upper-bound of sparkline for network TX status."
+  :group 'symon)
+
 ;; + utilities
 
 (defun symon--make-sparkline (list &optional minimum maximum)
@@ -102,7 +111,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
               (aset image-data (+ (* (- height y 1) width) x) t))))))
     `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))
 
-(defun symon--make-ring ()
+(defun symon--make-history-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
@@ -125,7 +134,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
              (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
          (setup-fn
           `(lambda ()
-             (aset ,cell 0 (symon--make-ring))
+             (aset ,cell 0 (symon--make-history-ring))
              (aset ,cell 1 (run-with-timer 0 ,interval ,update-fn))
              ,(plist-get plist :setup)
              (funcall ,update-fn)))
@@ -201,8 +210,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; + linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
-  "extract lines starting with INDEX in FILE and read them with
-READER."
   (with-temp-buffer
     (insert-file-contents file)
     (goto-char 1)
@@ -246,7 +253,6 @@ READER."
 
 (define-symon-monitor symon-linux-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
-  :setup (require 'battery)
   :fetch (when battery-status-function
            (read (cdr (assoc ?p (funcall battery-status-function))))))
 
@@ -331,13 +337,15 @@ READER."
   :fetch (symon-windows--read-value "bat"))
 
 (define-symon-monitor symon-windows-network-rx-monitor
-  :index "RX:" :unit "KB/s" :upper-bound 1000 :sparkline t
+  :index "RX:" :unit "KB/s" :sparkline t
+  :upper-bound symon-network-rx-upper-bound
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
   :fetch (symon-windows--read-value "rx"))
 
 (define-symon-monitor symon-windows-network-tx-monitor
-  :index "TX:" :unit "KB/s" :upper-bound 1000 :sparkline t
+  :index "TX:" :unit "KB/s" :sparkline t
+  :upper-bound symon-network-tx-upper-bound
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
   :fetch (symon-windows--read-value "tx"))
