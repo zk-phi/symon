@@ -261,6 +261,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (define-symon-monitor symon-linux-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-rx-upper-bound
+  :setup (setq symon-linux--last-network-rx nil)
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
            (goto-char 1)
@@ -277,6 +278,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (define-symon-monitor symon-linux-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-tx-upper-bound
+  :setup (setq symon-linux--last-network-tx nil)
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
            (goto-char 1)
@@ -299,30 +301,42 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   (unless (get-buffer " *symon-wmi*")
     (let ((proc (start-process-shell-command
                  "symon-wmi" " *symon-wmi*"
-                 (format
-                  (concat "powershell -command while(1) {"
-                          "echo ----;"
-                          ;; memory usage
-                          "$t = (gwmi Win32_ComputerSystem).TotalPhysicalMemory / 1000;"
-                          "$f = (gwmi Win32_OperatingSystem).FreePhysicalMemory;"
-                          "echo mem:$(($t - $f) * 100 / $t);"
-                          ;; page file usage
-                          "echo swap:$((gwmi Win32_PageFileUsage).CurrentUsage);"
-                          ;; cpu load
-                          "$w = gwmi Win32_PerfFormattedData_Counters_ProcessorInformation;"
-                          "echo cpu:$($w.get(0).PercentProcessorTime);"
-                          ;; battery
-                          "echo bat:$((gwmi Win32_Battery).EstimatedChargeRemaining);"
-                          ;; rx/tx
-                          "$r = 0; $t = 0;"
-                          "$w = gwmi Win32_PerfFormattedData_Tcpip_NetworkInterface;"
-                          "foreach($x in $w){"
-                          "$r = $r + $x.BytesReceivedPersec;"
-                          "$t = $t + $x.BytesSentPersec }"
-                          "echo rx:$($r / 1000);"
-                          "echo tx:$($t / 1000);"
-                          ;; loop
-                          "sleep %d }") symon-refresh-rate)))
+                 (format "powershell -command                       \
+$last = 0;                                                          \
+while(1)                                                            \
+{                                                                   \
+    echo ----;                                                      \
+                                                                    \
+    $t = (gwmi Win32_ComputerSystem).TotalPhysicalMemory / 1000;    \
+    $f = (gwmi Win32_OperatingSystem).FreePhysicalMemory;           \
+    echo mem:$(($t - $f) * 100 / $t);                               \
+                                                                    \
+    echo swap:$((gwmi Win32_PageFileUsage).CurrentUsage);           \
+                                                                    \
+    echo bat:$((gwmi Win32_Battery).EstimatedChargeRemaining);      \
+                                                                    \
+    $r = 0;                                                         \
+    $t = 0;                                                         \
+    $w = gwmi Win32_PerfRawData_Tcpip_NetworkInterface;             \
+    foreach($x in $w){                                              \
+        $r = $r + $x.BytesReceivedPersec;                           \
+        $t = $t + $x.BytesSentPersec                                \
+    }                                                               \
+    echo rx:$($r / 1000);                                           \
+    echo tx:$($t / 1000);                                           \
+                                                                    \
+    $p = (gwmi Win32_PerfRawData_Counters_ProcessorInformation)[0]; \
+    if($last)                                                       \
+    {                                                               \
+        $dt = $p.Timestamp_Sys100NS - $last.Timestamp_Sys100NS;     \
+        $dp = $p.PercentProcessorTime - $last.PercentProcessorTime; \
+        echo cpu:$((1 - ($dp / $dt)) * 100);                        \
+    }                                                               \
+    $last = $p;                                                     \
+                                                                    \
+    sleep %d                                                        \
+}"
+                         symon-refresh-rate)))
           (filter (lambda (proc str)
                     (when (get-buffer " *symon-wmi*")
                       (with-current-buffer " *symon-wmi*"
@@ -369,19 +383,33 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   :cleanup (symon-windows--maybe-kill-wmi-process)
   :fetch (symon-windows--read-value "bat"))
 
+(defvar symon-windows--last-network-rx nil)
+
 (define-symon-monitor symon-windows-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-rx-upper-bound
-  :setup (symon-windows--maybe-start-wmi-process)
+  :setup (progn
+           (symon-windows--maybe-start-wmi-process)
+           (setq symon-windows--last-network-rx nil))
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "rx"))
+  :fetch (let ((rx (symon-windows--read-value "rx")))
+           (prog1 (when symon-windows--last-network-rx
+                    (/ (- rx symon-windows--last-network-rx) symon-refresh-rate))
+             (setq symon-windows--last-network-rx rx))))
+
+(defvar symon-windows--last-network-tx nil)
 
 (define-symon-monitor symon-windows-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-tx-upper-bound
-  :setup (symon-windows--maybe-start-wmi-process)
+  :setup (progn
+           (symon-windows--maybe-start-wmi-process)
+           (setq symon-windows--last-network-tx nil))
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "tx"))
+  :fetch (let ((tx (symon-windows--read-value "tx")))
+           (prog1 (when symon-windows--last-network-tx
+                    (/ (- tx symon-windows--last-network-tx) symon-refresh-rate))
+             (setq symon-windows--last-network-tx tx))))
 
 ;; + misc monitors
 
