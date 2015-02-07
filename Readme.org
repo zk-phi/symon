@@ -69,8 +69,6 @@ You need to setup all these 4 variables before activating
 
   - =symon-current-time-monitor= :: current Time (hh::mm)
 
-  - =symon-file-system-monitor= :: disc usage (%)
-
 ** NOTE
 
 This is still a beta project.

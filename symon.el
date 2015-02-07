@@ -350,12 +350,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))
 
-(define-symon-monitor symon-file-system-monitor
-  :index "DISK:" :unit "%" :sparkline t
-  :fetch (let ((info (file-system-info default-directory)))
-           (when info
-             (/ (- (car info) (cadr info)) (/ (car info) 100)))))
-
 ;; + provide
 
 (provide 'symon)
