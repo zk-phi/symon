@@ -256,10 +256,27 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   :fetch (when battery-status-function
            (read (cdr (assoc ?p (funcall battery-status-function))))))
 
+(defvar symon-linux--last-network-rx nil)
+
+(define-symon-monitor symon-linux-network-rx-monitor
+  :index "RX:" :unit "KB/s" :sparkline t
+  :upper-bound symon-network-rx-upper-bound
+  :fetch (with-temp-buffer
+           (insert-file-contents "/proc/net/dev")
+           (goto-char 1)
+           (let ((rx 0))
+             (while (search-forward-regexp "^[\s\t]*\\(.*\\):" nil t)
+               (unless (string= (match-string 1) "lo")
+                 (setq rx (+ rx (read (current-buffer))))))
+             (prog1 (when symon-linux--last-network-rx
+                      (/ (- rx symon-linux--last-network-rx) symon-refresh-rate 1000))
+               (setq symon-linux--last-network-rx rx)))))
+
 (defvar symon-linux--last-network-tx nil)
 
 (define-symon-monitor symon-linux-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
+  :upper-bound symon-network-tx-upper-bound
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
            (goto-char 1)
@@ -271,21 +288,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
              (prog1 (when symon-linux--last-network-tx
                       (/ (- tx symon-linux--last-network-tx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-tx tx)))))
-
-(defvar symon-linux--last-network-tx nil)
-
-(define-symon-monitor symon-linux-network-tx-monitor
-  :index "TX:" :unit "KB/s" :sparkline t
-  :fetch (with-temp-buffer
-           (insert-file-contents "/proc/net/dev")
-           (goto-char 1)
-           (let ((rx 0))
-             (while (search-forward-regexp "^[\s\t]*\\(.*\\):" nil t)
-               (unless (string= (match-string 1) "lo")
-                 (setq rx (+ rx (read (current-buffer))))))
-             (prog1 (when symon-linux--last-network-tx
-                      (/ (- rx symon-linux--last-network-tx) symon-refresh-rate 1000))
-               (setq symon-linux--last-network-tx rx)))))
 
 ;; + windows monitors
 
