@@ -106,9 +106,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "like `(make-ring symon-history-size)' but filled with `nil'."
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
-(defun symon--file-contents (file)
-  (with-temp-buffer (insert-file-contents file) (buffer-string)))
-
 ;; + symon monitor
 
 ;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
@@ -204,6 +201,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; + linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
+  "extract lines starting with INDEX in FILE and read them with
+READER."
   (with-temp-buffer
     (insert-file-contents file)
     (goto-char 1)
