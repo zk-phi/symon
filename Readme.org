@@ -56,6 +56,12 @@ You need to setup all these 4 variables before activating
   - =symon-linux-battery-monitor= :: remaining battery (%) via
        built-in library =battery.el=
 
+  - =symon-linux-network-rx-monitor= :: network RX (KB/s) via
+       =/proc/net/dev=
+
+  - =symon-linux-network-tx-monitor= :: network TX (KB/s) via
+       =/proc/net/dev=
+
 - Windows
 
   - =symon-windows-memory-monitor= :: memory usage (%) and page file
@@ -64,6 +70,10 @@ You need to setup all these 4 variables before activating
   - =symon-windows-cpu-monitor= :: CPU load (%) via =WMI=
 
   - =symon-windows-battery-monitor= :: remaining battery (%) via =WMI=
+
+  - =symon-windows-network-rx-monitor= :: network RX (KB/s) via =WMI=
+
+  - =symon-windows-network-tx-monitor= :: network TX (KB/s) via =WMI=
 
 - misc
 
