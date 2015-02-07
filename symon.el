@@ -229,8 +229,6 @@ READER."
                         (/ (* (- total-diff idle-diff) 100) total-diff)))
                (setq symon-linux--last-cpu-ticks (cons total idle))))))
 
-(defvar symon-linux--swapped-meomry nil)
-
 (define-symon-monitor symon-linux-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
   :fetch (cl-destructuring-bind (memtotal memavailable memfree buffers cached)
