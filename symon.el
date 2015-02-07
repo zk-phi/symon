@@ -203,46 +203,49 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 ;; + linux monitors
 
+(defun symon-linux--read-lines (file reader indices)
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char 1)
+    (mapcar (lambda (index)
+              (save-excursion
+                (when (search-forward-regexp (concat "^" index "\\(.*\\)$") nil t)
+                  (if reader
+                      (funcall reader (match-string 1))
+                    (match-string 1)))))
+            indices)))
+
 (defvar symon-linux--last-cpu-ticks nil)
 
 (define-symon-monitor symon-linux-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
   :setup (setq symon-linux--last-cpu-ticks nil)
-  :fetch (let* ((str (symon--file-contents "/proc/stat"))
-                (_ (string-match "^cpu\\_>\\(.*\\)$" str))
-                (lst (mapcar 'read (split-string (match-string 1 str) nil t)))
-                (total (apply '+ lst))
-                (idle (nth 3 lst)))
-           (prog1 (when symon-linux--last-cpu-ticks
-                    (let ((total-diff (- total (car symon-linux--last-cpu-ticks)))
-                          (idle-diff (- idle (cdr symon-linux--last-cpu-ticks))))
-                      (/ (* (- total-diff idle-diff) 100) total-diff)))
-             (setq symon-linux--last-cpu-ticks (cons total idle)))))
+  :fetch (cl-destructuring-bind (cpu)
+             (symon-linux--read-lines
+              "/proc/stat" (lambda (str) (mapcar 'read (split-string str nil t))) '("cpu"))
+           (let ((total (apply '+ cpu)) (idle (nth 3 cpu)))
+             (prog1 (when symon-linux--last-cpu-ticks
+                      (let ((total-diff (- total (car symon-linux--last-cpu-ticks)))
+                            (idle-diff (- idle (cdr symon-linux--last-cpu-ticks))))
+                        (/ (* (- total-diff idle-diff) 100) total-diff)))
+               (setq symon-linux--last-cpu-ticks (cons total idle))))))
 
 (defvar symon-linux--swapped-meomry nil)
 
 (define-symon-monitor symon-linux-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
-  :fetch (let* ((str (symon--file-contents "/proc/meminfo"))
-                (_ (string-match "^SwapTotal:[\s\t]*\\([0-9]+\\)\\>" str))
-                (swaptotal (read (match-string 1 str)))
-                (_ (string-match "^SwapFree:[\s\t]*\\([0-9]+\\)\\>" str))
-                (swapfree (read (match-string 1 str)))
-                (_ (string-match "^MemTotal:[\s\t]*\\([0-9]+\\)\\>" str))
-                (memtotal (read (match-string 1 str))))
-           (setq symon-linux--swapped-meomry (/ (- swaptotal swapfree) 1000))
-           (if (string-match "^MemAvailable:[\s\t]*\\([0-9]+\\)\\>" str)
-               (/ (* (- memtotal (read (match-string 1 str))) 100) memtotal)
-             (let* ((_ (string-match "^MemFree:[\s\t]*\\([0-9]+\\)\\>" str))
-                    (memfree (read (match-string 1 str)))
-                    (_ (string-match "^Buffers:[\s\t]*\\([0-9]+\\)\\>" str))
-                    (buffers (read (match-string 1 str)))
-                    (_ (string-match "^Cached:[\s\t]*\\([0-9]+\\)\\>" str))
-                    (cached (read (match-string 1 str))))
-               (/ (* (- memtotal (+ memfree buffers cached)) 100) memtotal))))
-  :annotation (when (and symon-linux--swapped-meomry
-                         (not (zerop symon-linux--swapped-meomry)))
-                (format "%dMB Swapped" symon-linux--swapped-meomry)))
+  :fetch (cl-destructuring-bind (memtotal memavailable memfree buffers cached)
+             (symon-linux--read-lines
+              "/proc/meminfo" (lambda (str) (and str (read str)))
+              '("MemTotal:" "MemAvailable:" "MemFree:" "Buffers:" "Cached:"))
+           (if memavailable
+               (/ (* (- memtotal memavailable) 100) memtotal)
+             (/ (* (- memtotal (+ memfree buffers cached)) 100) memtotal)))
+  :annotation (cl-destructuring-bind (swaptotal swapfree)
+                  (symon-linux--read-lines
+                   "/proc/meminfo" 'read '("SwapTotal:" "SwapFree:"))
+                (let ((swapped (/ (- swaptotal swapfree) 1000)))
+                  (unless (zerop swapped) (format "%dMB Swapped" swapped)))))
 
 (define-symon-monitor symon-linux-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
@@ -257,7 +260,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (defun symon-windows--maybe-start-wmi-process ()
   (setq symon-windows--wmi-process-reference-count
         (1+ symon-windows--wmi-process-reference-count))
-  (unless (buffer-live-p (get-buffer " *symon-wmi*"))
+  (unless (get-buffer " *symon-wmi*")
     (let ((proc (start-process-shell-command
                  "symon-wmi" " *symon-wmi*"
                  (format
@@ -280,17 +283,18 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                           "foreach($x in $w){"
                           "$r = $r + $x.BytesReceivedPersec;"
                           "$t = $t + $x.BytesSentPersec }"
-                          "echo rx:$r;"
-                          "echo tx:$t;"
+                          "echo rx:$($r / 1000);"
+                          "echo tx:$($t / 1000);"
                           ;; loop
                           "sleep %d }") symon-refresh-rate)))
-          (filter (lambda (_ str)
-                    (with-current-buffer " *symon-wmi*"
-                      (when (and (save-match-data (string-match "-" str))
-                                 (search-backward "----" nil t))
-                        (delete-region 1 (point)))
-                      (goto-char (1+ (buffer-size)))
-                      (insert str)))))
+          (filter (lambda (proc str)
+                    (when (get-buffer " *symon-wmi*")
+                      (with-current-buffer " *symon-wmi*"
+                        (when (and (string-match "-" str)
+                                   (search-backward "----" nil t))
+                          (delete-region 1 (point)))
+                        (goto-char (1+ (buffer-size)))
+                        (insert str))))))
       (set-process-query-on-exit-flag proc nil)
       (set-process-filter proc filter))))
 
@@ -298,41 +302,36 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   (setq symon-windows--wmi-process-reference-count
         (1- symon-windows--wmi-process-reference-count))
   (when (and (zerop symon-windows--wmi-process-reference-count)
-             (buffer-live-p (get-buffer " *symon-wmi*")))
-    (kill-process (get-buffer-process " *symon-wmi*"))
+             (get-buffer " *symon-wmi*"))
     (kill-buffer " *symon-wmi*")))
+
+(defun symon-windows--read-value (index)
+  (when (get-buffer " *symon-wmi*")
+    (with-current-buffer " *symon-wmi*"
+      (when (save-excursion
+              (search-backward-regexp (concat index ":\\([0-9]+\\)\\>") nil t))
+        (read (match-string 1))))))
 
 (define-symon-monitor symon-windows-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (with-current-buffer " *symon-wmi*"
-           (when (save-excursion
-                   (search-backward-regexp "cpu:\\([0-9]+\\)\\>" nil t))
-             (read (match-string 1)))))
+  :fetch (symon-windows--read-value "cpu"))
 
 (define-symon-monitor symon-windows-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (with-current-buffer " *symon-wmi*"
-           (when (save-excursion
-                   (search-backward-regexp "mem:\\([0-9]+\\)\\>" nil t))
-             (read (match-string 1))))
-  :annotation (with-current-buffer " *symon-wmi*"
-                (when (save-excursion
-                        (search-backward-regexp "swap:\\([0-9]+\\)\\>" nil t))
-                  (let ((swapped (read (match-string 1))))
-                    (unless (zerop swapped) (format "%dMB Swapped" swapped))))))
+  :fetch (symon-windows--read-value "mem")
+  :annotation (let ((swapped (symon-windows--read-value "swap")))
+                (when (and swapped (> swapped 0))
+                  (format "%dMB Swapped" swapped))))
 
 (define-symon-monitor symon-windows-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (with-current-buffer " *symon-wmi*"
-           (when (save-excursion
-                   (search-backward-regexp "bat:\\([0-9]+\\)\\>" nil t))
-             (read (match-string 1)))))
+  :fetch (symon-windows--read-value "bat"))
 
 ;; + misc monitors
 

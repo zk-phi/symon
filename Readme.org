@@ -61,7 +61,7 @@ You need to setup all these 4 variables before activating
   - =symon-windows-memory-monitor= :: memory usage (%) and page file
        usage (MB) via =WMI=
 
-  - =symon-windows-cpu-monitor= :: CPU load (%) via =typeperf=
+  - =symon-windows-cpu-monitor= :: CPU load (%) via =WMI=
 
   - =symon-windows-battery-monitor= :: remaining battery (%) via =WMI=
 
