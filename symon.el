@@ -333,6 +333,18 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   :cleanup (symon-windows--maybe-kill-wmi-process)
   :fetch (symon-windows--read-value "bat"))
 
+(define-symon-monitor symon-windows-network-rx-monitor
+  :index "RX:" :unit "KB/s" :upper-bound 1000 :sparkline t
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (symon-windows--read-value "rx"))
+
+(define-symon-monitor symon-windows-network-tx-monitor
+  :index "TX:" :unit "KB/s" :upper-bound 1000 :sparkline t
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (symon-windows--read-value "tx"))
+
 ;; + misc monitors
 
 (define-symon-monitor symon-current-time-monitor
