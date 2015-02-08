@@ -69,11 +69,13 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   (cond ((memq system-type '(gnu/linux cygwin))
          '(symon-linux-memory-monitor
            symon-linux-cpu-monitor
-           symon-linux-battery-monitor))
+           symon-linux-network-rx-monitor
+           symon-linux-network-tx-monitor))
         ((memq system-type '(windows-nt))
          '(symon-windows-memory-monitor
            symon-windows-cpu-monitor
-           symon-windows-battery-monitor)))
+           symon-windows-network-rx-monitor
+           symon-windows-network-tx-monitor)))
   "list of monitors used to read system statuses. *set this
   option BEFORE enabling `symon-mode'.*")
 
