@@ -6,7 +6,7 @@ tiny graphical system monitor
 
 ** Screenshot
 
-[[img/screenshot.png]]
+[[file:img/screenshot.png]]
 
 ** NOTE: RECENT INCOMPATIBLE CHANGES
 
@@ -53,15 +53,15 @@ You need to restart =symon-mode= in order to reflect changes of these
 
   - =symon-sparkline-type-plain=
 
-    [[img/plain.png]]
+    [[file:img/plain.png]]
 
   - =symon-sparkline-type-bounded=
 
-    [[img/bounded.png]]
+    [[file:img/bounded.png]]
 
   - =symon-sparkline-type-gridded=
 
-    [[img/gridded.png]]
+    [[file:img/gridded.png]]
 
 ** Preconfigured Monitors
 
