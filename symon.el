@@ -132,6 +132,14 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
         `(image :type xbm :data ,image-data :ascent ,symon-sparkline-ascent
                 :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
+(defun symon--sparkline-draw-horizontal-line (vec y)
+  (dotimes (x/2 (/ symon-sparkline-width 2))
+    (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
+
+(defun symon--sparkline-draw-vertical-line (vec x)
+  (dotimes (y/2 (/ symon-sparkline-height 2))
+    (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
+
 (defun symon--make-history-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
@@ -148,39 +156,25 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 (defun symon-sparkline-type-bounded ()
   "returns a boxed sparkline base."
-  (let ((vec (make-bool-vector
-              (* symon-sparkline-height symon-sparkline-width) nil)))
-    ;; top/bottom line
-    (let ((y1 0) (y2 (1- symon-sparkline-height)))
-     (dotimes (x/2 (/ symon-sparkline-width 2))
-       (aset vec (+ (* y1 symon-sparkline-width) (* x/2 2)) t)
-       (aset vec (+ (* y2 symon-sparkline-width) (* x/2 2)) t)))
+  (let ((vec (symon-sparkline-type-plain)))
+    (symon--sparkline-draw-horizontal-line vec 0)
+    (symon--sparkline-draw-horizontal-line vec (1- symon-sparkline-height))
+    vec))
+
+(defun symon-sparkline-type-boxed ()
+  "returns a boxed sparkline base."
+  (let ((vec (symon-sparkline-type-bounded)))
+    (symon--sparkline-draw-vertical-line vec 0)
+    (symon--sparkline-draw-vertical-line vec (1- symon-sparkline-width))
     vec))
 
 (defun symon-sparkline-type-gridded ()
-  "returns a boxed sparkline base."
-  (let ((vec (make-bool-vector
-              (* symon-sparkline-height symon-sparkline-width) nil)))
-    ;; horizontal lines
-    (let ((y1 0)
-          (y2 (/ symon-sparkline-height 2))
-          (y3 (1- symon-sparkline-height)))
-      (dotimes (x/2 (/ symon-sparkline-width 2))
-        (aset vec (+ (* y1 symon-sparkline-width) (* x/2 2)) t)
-        (aset vec (+ (* y2 symon-sparkline-width) (* x/2 2)) t)
-        (aset vec (+ (* y3 symon-sparkline-width) (* x/2 2)) t)))
-    ;; vertical lines
-    (let ((x1 0)
-          (x2 (/ symon-sparkline-width 4))
-          (x3 (/ symon-sparkline-width 2))
-          (x4 (/ (* symon-sparkline-width 3) 4))
-          (x5 (1- symon-sparkline-width)))
-      (dotimes (y/2 (/ symon-sparkline-height 2))
-        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x1) t)
-        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x2) t)
-        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x3) t)
-        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x4) t)
-        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x5) t)))
+  "returns a gridded sparkline base."
+  (let ((vec (symon-sparkline-type-boxed)))
+    (symon--sparkline-draw-horizontal-line vec (/ symon-sparkline-height 2))
+    (symon--sparkline-draw-vertical-line   vec (/ symon-sparkline-width 4))
+    (symon--sparkline-draw-vertical-line   vec (/ symon-sparkline-width 2))
+    (symon--sparkline-draw-vertical-line   vec (/ (* symon-sparkline-width 3) 4))
     vec))
 
 ;; + symon monitors

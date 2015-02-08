@@ -63,6 +63,10 @@ You need to restart =symon-mode= in order to reflect changes of these
 
     [[file:img/bounded.png]]
 
+  - =symon-sparkline-type-boxed=
+
+    [[file:img/boxed.png]]
+
   - =symon-sparkline-type-gridded=
 
     [[file:img/gridded.png]]
