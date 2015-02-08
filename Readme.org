@@ -4,11 +4,11 @@
 
 tiny graphical system monitor
 
-** Screencast
+** Screenshot
 
 [[img/screenshot.png]]
 
-** NOTE: RECENT VISIBLE CHANGES
+** NOTE: RECENT INCOMPATIBLE CHANGES
 
 - =symon-initialize= is now obsolete (use =symon-mode= instead)
 - =symon-fetcher= is now obsolete (use =symon-monitors= instead)
