@@ -112,8 +112,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
           (when (numberp sample)
             (setq y (floor (* (- sample minimum) height-per-point)))
             (when (and (<= 0 y) (< y symon-sparkline-height))
-              (setq ix (+ (* (- symon-sparkline-height y 1) symon-sparkline-width) x))
-              (aset image-data ix (not (aref image-data ix))))))
+              (aset image-data (+ (* (- symon-sparkline-height y 1)
+                                     symon-sparkline-width) x) t))))
         `(image :type xbm :data ,image-data :ascent 100
                 :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
@@ -130,10 +130,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (defun symon-sparkline-type-plain ()
   "returns a plain sparkline base."
   (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
-
-(defun symon-sparkline-type-inverted ()
-  "returns a inverted sparkline base."
-  (make-bool-vector (* symon-sparkline-height symon-sparkline-width) t))
 
 (defun symon-sparkline-type-bounded ()
   "returns a boxed sparkline base."
