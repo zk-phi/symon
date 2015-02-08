@@ -55,10 +55,6 @@ You need to restart =symon-mode= in order to reflect changes of these
 
     [[img/plain.png]]
 
-  - =symon-sparkline-type-inverted=
-
-    [[img/inverted.png]]
-
   - =symon-sparkline-type-bounded=
 
     [[img/bounded.png]]
