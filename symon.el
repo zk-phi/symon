@@ -394,10 +394,7 @@ while(1)                                                            \
   :index "MEM:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "mem")
-  :annotation (let ((swapped (symon-windows--read-value "swap")))
-                (when (and swapped (> swapped 0))
-                  (format "%dMB Swapped" swapped))))
+  :fetch (symon-windows--read-value "mem"))
 
 (define-symon-monitor symon-windows-page-file-monitor
   :index "PF:" :unit "MB" :sparkline t
