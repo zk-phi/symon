@@ -93,7 +93,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "line width of sparklines."
   :group 'symon)
 
-(defcustom symon-sparkline-type 'symon-sparkline-type-plain
+(defcustom symon-sparkline-type 'symon-sparkline-type-gridded
   "type of sparklines."
   :group 'symon)
 
