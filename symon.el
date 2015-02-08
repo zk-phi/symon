@@ -105,6 +105,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "upper-bound of sparkline for network TX status."
   :group 'symon)
 
+(defcustom symon-windows-page-file-upper-bound 2000
+  "upper-bound of sparkline for page file usage."
+  :group 'symon)
+
 ;; + utilities
 
 (defun symon--make-sparkline (list &optional minimum maximum)
@@ -394,6 +398,13 @@ while(1)                                                            \
   :annotation (let ((swapped (symon-windows--read-value "swap")))
                 (when (and swapped (> swapped 0))
                   (format "%dMB Swapped" swapped))))
+
+(define-symon-monitor symon-windows-page-file-monitor
+  :index "PF:" :unit "MB" :sparkline t
+  :upper-bound symon-windows-page-file-upper-bound
+  :setup (symon-windows--maybe-start-wmi-process)
+  :cleanup (symon-windows--maybe-kill-wmi-process)
+  :fetch (symon-windows--read-value "swap"))
 
 (define-symon-monitor symon-windows-battery-monitor
   :index "BAT:" :unit "%" :sparkline t

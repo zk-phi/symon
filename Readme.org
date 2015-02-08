@@ -91,8 +91,9 @@ You need to restart =symon-mode= in order to reflect changes of these
 
 - Windows
 
-  - =symon-windows-memory-monitor= :: memory usage (%) and page file
-       usage (MB) via =WMI=
+  - =symon-windows-memory-monitor= :: memory usage (%) via =WMI=
+
+  - =symon-windows-page-file-monitor= :: page file usage (MB) via =WMI=
 
   - =symon-windows-cpu-monitor= :: CPU load (%) via =WMI=
 
