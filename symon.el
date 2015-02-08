@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.1.0
+;; Version: 1.1.1
 
 ;;; Commentary:
 
@@ -36,13 +36,14 @@
 
 ;; 1.0.0 first release
 ;; 1.1.0 add option symon-sparkline-thickness
+;; 1.1.1 add symon-windows-page-file-monitor
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.1.0")
+(defconst symon-version "1.1.1")
 
 (defgroup symon nil
   "tiny graphical system monitor"
