@@ -82,6 +82,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "width of sparklines."
   :group 'symon)
 
+(defcustom symon-sparkline-ascent 100
+  "`:ascent' property for sparklines."
+  :group 'symon)
+
 (defcustom symon-sparkline-type 'symon-sparkline-type-plain
   "type of sparklines."
   :group 'symon)
@@ -114,7 +118,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
             (when (and (<= 0 y) (< y symon-sparkline-height))
               (aset image-data (+ (* (- symon-sparkline-height y 1)
                                      symon-sparkline-width) x) t))))
-        `(image :type xbm :data ,image-data :ascent 100
+        `(image :type xbm :data ,image-data :ascent ,symon-sparkline-ascent
                 :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
 (defun symon--make-history-ring ()
