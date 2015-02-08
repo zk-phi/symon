@@ -12,6 +12,8 @@ tiny graphical system monitor
 
 - =symon-initialize= is now obsolete (use =symon-mode= instead)
 - =symon-fetcher= is now obsolete (use =symon-monitors= instead)
+- =symon-sparkline-size= is now obsolete (use =symon-sparkline-height=
+  and =symon-sparkline-width= instead)
 
 ** Usage
 
@@ -42,7 +44,9 @@ then a tiny system monitor is displayed in minibuffer, during idle.
 You need to setup all these 4 variables before activating
 =symon-mode=.
 
-- =symon-sparkline-size= :: =(WIDTH . HEIGHT)= of sparkline.
+- =symon-sparkline-height= :: height of sparklines.
+
+- =symon-sparkline-width= :: width of sparklines.
 
 ** Provided Monitors
 

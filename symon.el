@@ -74,8 +74,12 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "list of monitors used to read system statuses. *set this
   option BEFORE enabling `symon-mode'.*")
 
-(defcustom symon-sparkline-size '(80 . 11)
-  "(WIDTH . HEIGHT) of sparkline."
+(defcustom symon-sparkline-height 11
+  "height of sparklines."
+  :group 'symon)
+
+(defcustom symon-sparkline-width 80
+  "width of sparklines."
   :group 'symon)
 
 (defcustom symon-network-rx-upper-bound 300
@@ -92,29 +96,30 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
     (unless (zerop num-samples)
-      (let* ((width (car symon-sparkline-size))
-             (height (cdr symon-sparkline-size))
-             (image-data (make-bool-vector (* height width) nil))
+      (let* ((image-data (make-bool-vector
+                          (* symon-sparkline-height symon-sparkline-width) nil))
              (maximum (if maximum (float maximum) 100.0))
              (minimum (if minimum (float minimum) 0.0))
-             (height-per-point (/ height (1+ (- maximum minimum))))
-             (width-per-sample (/ width (float num-samples)))
+             (height-per-point (/ symon-sparkline-height (1+ (- maximum minimum))))
+             (width-per-sample (/ symon-sparkline-width (float num-samples)))
              (samples (apply 'vector list))
              sample y ix)
-        (dotimes (x width)
+        (dotimes (x symon-sparkline-width)
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
             (setq y (floor (* (- sample minimum) height-per-point)))
-            (when (and (<= 0 y) (< y height))
-              (setq ix (+ (* (- height y 1) width) x))
+            (when (and (<= 0 y) (< y symon-sparkline-height))
+              (setq ix (+ (* (- symon-sparkline-height y 1) symon-sparkline-width) x))
               (aset image-data ix (not (aref image-data ix))))))
-        `(image :type xbm :data ,image-data :height ,height :width ,width :ascent 100)))))
+        `(image :type xbm :data ,image-data :ascent 100
+                :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
 (defun symon--make-history-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
-;; + symon monitor
+;; + symon monitors
+;; ++ define-symon-monitor
 
 ;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
 ;; DISPLAY-FN]. SETUP-FN is called on activation of `symon-mode', and
@@ -161,52 +166,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                                        " ")))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
-;; + symon core
-
-(defvar symon--cleanup-fns    nil)
-(defvar symon--display-fns    nil)
-(defvar symon--display-active nil)
-(defvar symon--timer-objects  nil)
-
-;;;###autoload
-(define-minor-mode symon-mode
-  "tiny graphical system monitor"
-  :init-value nil
-  :global t
-  (cond (symon-mode
-         (unless symon-monitors
-           (message "Warning: `symon-monitors' is empty."))
-         (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
-           (mapc (lambda (m) (funcall (aref m 0))) monitors)
-           (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
-                 symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
-                 symon--display-active nil
-                 symon--timer-objects
-                 (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
-                       (run-with-idle-timer symon-delay t 'symon-display)))
-           (add-hook 'pre-command-hook 'symon--display-end)))
-        (t
-         (remove-hook 'pre-command-hook 'symon--display-end)
-         (mapc 'cancel-timer symon--timer-objects)
-         (mapc 'funcall symon--cleanup-fns))))
-
-(defun symon-display ()
-  "activate symon display."
-  (interactive)
-  (unless (active-minibuffer-window)
-    (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
-      (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
-    (setq symon--display-active t)))
-
-(defun symon--redisplay ()
-  "update symon display."
-  (when symon--display-active (symon-display)))
-
-(defun symon--display-end ()
-  "deactivate symon display."
-  (setq symon--display-active nil))
-
-;; + linux monitors
+;; ++ linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
   (with-temp-buffer
@@ -290,7 +250,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                       (/ (- tx symon-linux--last-network-tx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-tx tx)))))
 
-;; + windows monitors
+;; ++ windows monitors
 
 (defvar symon-windows--wmi-process-reference-count 0)
 
@@ -339,8 +299,7 @@ while(1)                                                            \
           (filter (lambda (proc str)
                     (when (get-buffer " *symon-wmi*")
                       (with-current-buffer " *symon-wmi*"
-                        (when (and (string-match "-" str)
-                                   (search-backward "----" nil t))
+                        (when (and (string-match "-" str) (search-backward "----" nil t))
                           (delete-region 1 (point)))
                         (goto-char (1+ (buffer-size)))
                         (insert str))))))
@@ -410,10 +369,63 @@ while(1)                                                            \
                     (/ (- tx symon-windows--last-network-tx) symon-refresh-rate))
              (setq symon-windows--last-network-tx tx))))
 
-;; + misc monitors
+;; ++ misc monitors
 
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))
+
+;; + symon core
+
+(defvar symon--cleanup-fns    nil)
+(defvar symon--display-fns    nil)
+(defvar symon--display-active nil)
+(defvar symon--timer-objects  nil)
+
+;;;###autoload
+(define-minor-mode symon-mode
+  "tiny graphical system monitor"
+  :init-value nil
+  :global t
+  (cond (symon-mode
+         (unless symon-monitors
+           (message "Warning: `symon-monitors' is empty."))
+         (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
+           (mapc (lambda (m) (funcall (aref m 0))) monitors)
+           (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
+                 symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
+                 symon--display-active nil
+                 symon--timer-objects
+                 (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
+                       (run-with-idle-timer symon-delay t 'symon-display)))
+           (add-hook 'pre-command-hook 'symon--display-end)))
+        (t
+         (remove-hook 'pre-command-hook 'symon--display-end)
+         (mapc 'cancel-timer symon--timer-objects)
+         (mapc 'funcall symon--cleanup-fns))))
+
+(defun symon-display ()
+  "activate symon display."
+  (interactive)
+  (unless (active-minibuffer-window)
+    (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
+      (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
+    (setq symon--display-active t)))
+
+(defun symon--redisplay ()
+  "update symon display."
+  (when symon--display-active (symon-display)))
+
+(defun symon--display-end ()
+  "deactivate symon display."
+  (setq symon--display-active nil))
+
+;; + (backward compatibility)
+
+(defvar symon-sparkline-size nil)
+
+(make-obsolete-variable 'symon-sparkline-size
+                        "symon-sparkline-height, symon-sparkline-width"
+                        "2015/2/8")
 
 ;; + provide
 
