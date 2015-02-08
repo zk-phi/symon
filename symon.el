@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.0.0
+;; Version: 1.1.0
 
 ;;; Commentary:
 
@@ -34,12 +34,15 @@
 
 ;;; Change Log:
 
+;; 1.0.0 first release
+;; 1.1.0 add option symon-sparkline-thickness
+
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.0.0")
+(defconst symon-version "1.1.0")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -74,10 +77,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "list of monitors used to read system statuses. *set this
   option BEFORE enabling `symon-mode'.*")
 
-(defcustom symon-hidpi-display nil
-  "hidpi image on or off."
-  :group 'symon)
-
 (defcustom symon-sparkline-height 11
   "height of sparklines."
   :group 'symon)
@@ -88,6 +87,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 (defcustom symon-sparkline-ascent 100
   "`:ascent' property for sparklines."
+  :group 'symon)
+
+(defcustom symon-sparkline-thickness 2
+  "line width of sparklines."
   :group 'symon)
 
 (defcustom symon-sparkline-type 'symon-sparkline-type-plain
@@ -104,32 +107,6 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 ;; + utilities
 
-(defun symon--upscale-image (bits width height)
-  "double the size of BITS in each dimension."
-  (let ((fatbits (make-bool-vector (* width height 4) nil)))
-    (dotimes (y height)
-      (dotimes (x width)
-	(let* ((pixel (aref bits (+ (* y width) x))) ;; original pixel value
-	      (width*2 (* width 2))
-	      (x*2 (* x 2))
-	      (y*2 (* y 2 width*2)))
-	  ;; replicate the pixel 4 times (increase the coverage by 2X)
-	  (aset fatbits (+ y*2 x*2) pixel)
-	  (aset fatbits (+ y*2 x*2 1) pixel)
-	  (aset fatbits (+ y*2 width*2 x*2) pixel)
-	  (aset fatbits (+ y*2 width*2 x*2 1) pixel))))
-    fatbits))
-
-(defun symon--create-image (data width height)
-  "contsruct an image from a vector of bits."
-  (if symon-hidpi-display
-      ;; upscale the image on a hidpi display
-      (progn
-	(setq data (symon--upscale-image data width height))
-	(setq width (* width 2))
-	(setq height (* height 2))))
-  `(image :type xbm :data ,data :ascent 100 :height ,height :width ,width))
-
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
@@ -137,7 +114,9 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
       (let* ((image-data (funcall symon-sparkline-type))
              (maximum (if maximum (float maximum) 100.0))
              (minimum (if minimum (float minimum) 0.0))
-             (height-per-point (/ symon-sparkline-height (1+ (- maximum minimum))))
+             (topmargin (1- symon-sparkline-thickness))
+             (height (- symon-sparkline-height topmargin))
+             (height-per-point (/ height (1+ (- maximum minimum))))
              (width-per-sample (/ symon-sparkline-width (float num-samples)))
              (samples (apply 'vector list))
              sample y ix)
@@ -145,10 +124,13 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
           (setq sample (aref samples (floor (/ x width-per-sample))))
           (when (numberp sample)
             (setq y (floor (* (- sample minimum) height-per-point)))
-            (when (and (<= 0 y) (< y symon-sparkline-height))
-              (aset image-data (+ (* (- symon-sparkline-height y 1)
-                                     symon-sparkline-width) x) t))))
-	(symon--create-image image-data symon-sparkline-width symon-sparkline-height)))))
+            (when (and (<= 0 y) (< y height))
+              (dotimes (dy symon-sparkline-thickness)
+                (aset image-data
+                      (+ (* (- symon-sparkline-height (+ y dy) 1) symon-sparkline-width) x)
+                      t)))))
+        `(image :type xbm :data ,image-data :ascent ,symon-sparkline-ascent
+                :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
 (defun symon--make-history-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
