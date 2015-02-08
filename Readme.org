@@ -100,4 +100,5 @@ You need to restart =symon-mode= in order to reflect changes of these
 
 - misc
 
-  - =symon-current-time-monitor= :: current Time (hh::mm)
+  - =symon-current-time-monitor= :: current Time (hh::mm) via built-in
+       function =format-time-stirng=
