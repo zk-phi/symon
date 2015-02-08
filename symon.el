@@ -74,6 +74,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "list of monitors used to read system statuses. *set this
   option BEFORE enabling `symon-mode'.*")
 
+(defcustom symon-hidpi-display nil
+  "hidpi image on or off."
+  :group 'symon)
+
 (defcustom symon-sparkline-height 11
   "height of sparklines."
   :group 'symon)
@@ -96,6 +100,32 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 ;; + utilities
 
+(defun symon--upscale-image (bits width height)
+  "double the size of BITS in each dimension."
+  (let ((fatbits (make-bool-vector (* width height 4) nil)))
+    (dotimes (y height)
+      (dotimes (x width)
+	(let* ((pixel (aref bits (+ (* y width) x))) ;; original pixel value
+	      (width*2 (* width 2))
+	      (x*2 (* x 2))
+	      (y*2 (* y 2 width*2)))
+	  ;; replicate the pixel 4 times (increase the coverage by 2X)
+	  (aset fatbits (+ y*2 x*2) pixel)
+	  (aset fatbits (+ y*2 x*2 1) pixel)
+	  (aset fatbits (+ y*2 width*2 x*2) pixel)
+	  (aset fatbits (+ y*2 width*2 x*2 1) pixel))))
+    fatbits))
+
+(defun symon--create-image (data width height)
+  "contsruct an image from a vector of bits."
+  (if symon-hidpi-display
+      ;; upscale the image on a hidpi display
+      (progn
+	(setq data (symon--upscale-image data width height))
+	(setq width (* width 2))
+	(setq height (* height 2))))
+  `(image :type xbm :data ,data :ascent 100 :height ,height :width ,width))
+
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
@@ -114,8 +144,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
             (when (and (<= 0 y) (< y symon-sparkline-height))
               (setq ix (+ (* (- symon-sparkline-height y 1) symon-sparkline-width) x))
               (aset image-data ix (not (aref image-data ix))))))
-        `(image :type xbm :data ,image-data :ascent 100
-                :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
+	(symon--create-image image-data symon-sparkline-width symon-sparkline-height)))))
 
 (defun symon--make-history-ring ()
   "like `(make-ring symon-history-size)' but filled with `nil'."
