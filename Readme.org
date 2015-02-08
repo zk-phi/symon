@@ -48,6 +48,10 @@ You need to restart =symon-mode= in order to reflect changes of these
 
 - =symon-sparkline-width= :: Width of sparklines.
 
+- =symon-sparkline-thickness= :: Line width of sparklines.
+
+- =symon-sparkline-ascent= :: Adjust vertical position of sparklines.
+
 - =symon-sparkline-type= :: Type of sparklines. following
      preconfigured types are available:
 
