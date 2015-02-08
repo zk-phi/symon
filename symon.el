@@ -82,6 +82,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "width of sparklines."
   :group 'symon)
 
+(defcustom symon-sparkline-type 'symon-sparkline-type-plain
+  "type of sparklines."
+  :group 'symon)
+
 (defcustom symon-network-rx-upper-bound 300
   "upper-bound of sparkline for network RX status."
   :group 'symon)
@@ -96,8 +100,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
     (unless (zerop num-samples)
-      (let* ((image-data (make-bool-vector
-                          (* symon-sparkline-height symon-sparkline-width) nil))
+      (let* ((image-data (funcall symon-sparkline-type))
              (maximum (if maximum (float maximum) 100.0))
              (minimum (if minimum (float minimum) 0.0))
              (height-per-point (/ symon-sparkline-height (1+ (- maximum minimum))))
@@ -118,8 +121,58 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "like `(make-ring symon-history-size)' but filled with `nil'."
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
+;; + sparkline types
+
+;; a sparkline type is a function, which takes no arguments and
+;; returns a (symon-sparkline-height * symon-sparkline-width) bool
+;; vector.
+
+(defun symon-sparkline-type-plain ()
+  "returns a plain sparkline base."
+  (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
+
+(defun symon-sparkline-type-inverted ()
+  "returns a inverted sparkline base."
+  (make-bool-vector (* symon-sparkline-height symon-sparkline-width) t))
+
+(defun symon-sparkline-type-bounded ()
+  "returns a boxed sparkline base."
+  (let ((vec (make-bool-vector
+              (* symon-sparkline-height symon-sparkline-width) nil)))
+    ;; top/bottom line
+    (let ((y1 0) (y2 (1- symon-sparkline-height)))
+     (dotimes (x/2 (/ symon-sparkline-width 2))
+       (aset vec (+ (* y1 symon-sparkline-width) (* x/2 2)) t)
+       (aset vec (+ (* y2 symon-sparkline-width) (* x/2 2)) t)))
+    vec))
+
+(defun symon-sparkline-type-gridded ()
+  "returns a boxed sparkline base."
+  (let ((vec (make-bool-vector
+              (* symon-sparkline-height symon-sparkline-width) nil)))
+    ;; horizontal lines
+    (let ((y1 0)
+          (y2 (/ symon-sparkline-height 2))
+          (y3 (1- symon-sparkline-height)))
+      (dotimes (x/2 (/ symon-sparkline-width 2))
+        (aset vec (+ (* y1 symon-sparkline-width) (* x/2 2)) t)
+        (aset vec (+ (* y2 symon-sparkline-width) (* x/2 2)) t)
+        (aset vec (+ (* y3 symon-sparkline-width) (* x/2 2)) t)))
+    ;; vertical lines
+    (let ((x1 0)
+          (x2 (/ symon-sparkline-width 4))
+          (x3 (/ symon-sparkline-width 2))
+          (x4 (/ (* symon-sparkline-width 3) 4))
+          (x5 (1- symon-sparkline-width)))
+      (dotimes (y/2 (/ symon-sparkline-height 2))
+        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x1) t)
+        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x2) t)
+        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x3) t)
+        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x4) t)
+        (aset vec (+ (* (* y/2 2) symon-sparkline-width) x5) t)))
+    vec))
+
 ;; + symon monitors
-;; ++ define-symon-monitor
 
 ;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
 ;; DISPLAY-FN]. SETUP-FN is called on activation of `symon-mode', and
@@ -127,6 +180,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; interval. CLEANUP-FN is called on deactivation and expected to tell
 ;; Emacs to stop fetching. DISPLAY-FN is called just before displaying
 ;; monitor, and must return display string for the monitor.
+
+;;   + define-symon-monitor
 
 (defmacro define-symon-monitor (name &rest plist)
   (let* ((cell (make-vector 2 nil))
@@ -166,7 +221,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                                        " ")))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
-;; ++ linux monitors
+;;   + linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
   (with-temp-buffer
@@ -250,7 +305,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                       (/ (- tx symon-linux--last-network-tx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-tx tx)))))
 
-;; ++ windows monitors
+;;   + windows monitors
 
 (defvar symon-windows--wmi-process-reference-count 0)
 
@@ -369,7 +424,7 @@ while(1)                                                            \
                     (/ (- tx symon-windows--last-network-tx) symon-refresh-rate))
              (setq symon-windows--last-network-tx tx))))
 
-;; ++ misc monitors
+;;   + misc monitors
 
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))

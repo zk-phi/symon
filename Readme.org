@@ -41,14 +41,33 @@ then a tiny system monitor is displayed in minibuffer, during idle.
 - =symon-history-size= :: Number of old values to keep. Sparklines
      grow faster when set smaller.
 
-You need to setup all these 4 variables before activating
-=symon-mode=.
+You need to restart =symon-mode= in order to reflect changes of these
+4 options.
 
-- =symon-sparkline-height= :: height of sparklines.
+- =symon-sparkline-height= :: Height of sparklines.
 
-- =symon-sparkline-width= :: width of sparklines.
+- =symon-sparkline-width= :: Width of sparklines.
 
-** Provided Monitors
+- =symon-sparkline-type= :: Type of sparklines. following
+     preconfigured types are available:
+
+  - =symon-sparkline-type-plain=
+
+    [[img/plain.png]]
+
+  - =symon-sparkline-type-inverted=
+
+    [[img/inverted.png]]
+
+  - =symon-sparkline-type-bounded=
+
+    [[img/bounded.png]]
+
+  - =symon-sparkline-type-gridded=
+
+    [[img/gridded.png]]
+
+** Preconfigured Monitors
 
 - GNU/Linux
 
