@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.0.0beta
+;; Version: 1.0.0
 
 ;;; Commentary:
 
@@ -39,7 +39,7 @@
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.0.0beta")
+(defconst symon-version "1.0.0")
 
 (defgroup symon nil
   "tiny graphical system monitor"

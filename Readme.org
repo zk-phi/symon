@@ -101,11 +101,3 @@ You need to restart =symon-mode= in order to reflect changes of these
 - misc
 
   - =symon-current-time-monitor= :: current Time (hh::mm)
-
-** NOTE
-
-This is still a beta project.
-
-May have some bugs, and APIs are volatile.
-
-Contributions are welcome!
