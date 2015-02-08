@@ -42,7 +42,7 @@ then a tiny system monitor is displayed in minibuffer, during idle.
      grow faster when set smaller.
 
 You need to restart =symon-mode= in order to reflect changes of these
-4 options.
+4 options above.
 
 - =symon-sparkline-height= :: Height of sparklines.
 
