@@ -72,6 +72,11 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
            symon-linux-cpu-monitor
            symon-linux-network-rx-monitor
            symon-linux-network-tx-monitor))
+        ((memq system-type '(darwin))
+         '(symon-darwin-memory-monitor
+           symon-darwin-cpu-monitor
+           symon-darwin-network-rx-monitor
+           symon-darwin-network-tx-monitor))
         ((memq system-type '(windows-nt))
          '(symon-windows-memory-monitor
            symon-windows-cpu-monitor
@@ -372,6 +377,72 @@ supoprted in PLIST:
              (prog1 (when symon-linux--last-network-tx
                       (/ (- tx symon-linux--last-network-tx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-tx tx)))))
+
+;;   + darwin monitors
+
+(define-symon-monitor symon-darwin-cpu-monitor
+  :index "CPU:" :unit "%" :sparkline t
+  :fetch (if (executable-find "hostinfo")
+             (let* ((str (shell-command-to-string "hostinfo")))
+               (string-match "^Load average: \\(.*\\)," str)
+               (string-to-number (match-string 1 str)))))
+
+(define-symon-monitor symon-darwin-memory-monitor
+  :index "MEM:" :unit "%" :sparkline t
+  :fetch (progn
+           (if (executable-find "sysctl")
+               (let* ((str (shell-command-to-string "sysctl hw")))
+                 (string-match "^hw.memsize = \\(.*\\)$" str)
+                 (setq memtotal (string-to-number (match-string 1 str)))
+                 (string-match "^hw.usermem = \\(.*\\)$" str)
+                 (setq usermem (string-to-number (match-string 1 str)))
+                 (/ (* usermem 100) memtotal)))))
+
+(define-symon-monitor symon-darwin-battery-monitor
+  :index "BAT:" :unit "%" :sparkline t
+  :fetch (when battery-status-function
+           (read (cdr (assoc ?p (funcall battery-status-function))))))
+
+(defvar symon-darwin--last-network-rx nil)
+
+(define-symon-monitor symon-darwin-network-rx-monitor
+  :index "RX:" :unit "KB/s" :sparkline t
+  :lower-bound 100.0
+  :upper-bound symon-network-rx-upper-bound
+  :setup (setq symon-darwin--last-network-rx nil)
+  :fetch (progn
+           (if (and (executable-find "route")
+                    (executable-find "netstat"))
+               (progn
+                 (setq str-interface (shell-command-to-string "route get 0.0.0.0"))
+                 (string-match "interface: \\(.*\\)$" str-interface)
+                 (setq interface (match-string 1 str-interface))
+                 (setq str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface)))
+                 (setq rx (string-to-number (nth 6 (split-string str-packets))))
+                 (prog1
+                     (when symon-darwin--last-network-rx
+                       (/ (- rx symon-darwin--last-network-rx) symon-refresh-rate 1000))
+                   (setq symon-darwin--last-network-rx rx))))))
+
+(defvar symon-darwin--last-network-tx nil)
+
+(define-symon-monitor symon-darwin-network-tx-monitor
+  :index "TX:" :unit "KB/s" :sparkline t
+  :lower-bound 100.0
+  :upper-bound symon-network-tx-upper-bound
+  :setup (setq symon-darwin--last-network-tx nil)
+  :fetch (progn
+           (if (and (executable-find "route")
+                    (executable-find "netstat"))
+               (let* ((str-interface (shell-command-to-string "route get 0.0.0.0"))
+                      (str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface))))
+                 (string-match "interface: \\(.*\\)$" str-interface)
+                 (setq interface (match-string 1 str-interface))
+                 (setq tx (string-to-number (nth 9 (split-string str-packets))))
+                 (prog1
+                     (when symon-darwin--last-network-tx
+                       (/ (- tx symon-darwin--last-network-tx) symon-refresh-rate 1000))
+                   (setq symon-darwin--last-network-tx tx))))))
 
 ;;   + windows monitors
 
