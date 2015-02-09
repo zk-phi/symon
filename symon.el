@@ -112,7 +112,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "upper-bound of sparkline for page file usage."
   :group 'symon)
 
-;; + utilities
+;; + sparklines
+;;   + sparkline generator
 
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
@@ -139,23 +140,19 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
         `(image :type xbm :data ,image-data :ascent ,symon-sparkline-ascent
                 :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
 
-(defun symon--sparkline-draw-horizontal-line (vec y)
-  (dotimes (x/2 (/ symon-sparkline-width 2))
-    (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
-
-(defun symon--sparkline-draw-vertical-line (vec x)
-  (dotimes (y/2 (/ symon-sparkline-height 2))
-    (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
-
-(defun symon--make-history-ring ()
-  "like `(make-ring symon-history-size)' but filled with `nil'."
-  (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
-
-;; + sparkline types
+;;   + sparkline types
 
 ;; a sparkline type is a function, which takes no arguments and
 ;; returns a (symon-sparkline-height * symon-sparkline-width) bool
 ;; vector.
+
+(defun symon--sparkline-draw-horizontal-grid (vec y)
+  (dotimes (x/2 (/ symon-sparkline-width 2))
+    (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
+
+(defun symon--sparkline-draw-vertical-grid (vec x)
+  (dotimes (y/2 (/ symon-sparkline-height 2))
+    (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
 
 (defun symon-sparkline-type-plain ()
   "returns a plain sparkline base."
@@ -164,27 +161,28 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 (defun symon-sparkline-type-bounded ()
   "returns a boxed sparkline base."
   (let ((vec (symon-sparkline-type-plain)))
-    (symon--sparkline-draw-horizontal-line vec 0)
-    (symon--sparkline-draw-horizontal-line vec (1- symon-sparkline-height))
+    (symon--sparkline-draw-horizontal-grid vec 0)
+    (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
     vec))
 
 (defun symon-sparkline-type-boxed ()
   "returns a boxed sparkline base."
   (let ((vec (symon-sparkline-type-bounded)))
-    (symon--sparkline-draw-vertical-line vec 0)
-    (symon--sparkline-draw-vertical-line vec (1- symon-sparkline-width))
+    (symon--sparkline-draw-vertical-grid vec 0)
+    (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
     vec))
 
 (defun symon-sparkline-type-gridded ()
   "returns a gridded sparkline base."
   (let ((vec (symon-sparkline-type-boxed)))
-    (symon--sparkline-draw-horizontal-line vec (/ symon-sparkline-height 2))
-    (symon--sparkline-draw-vertical-line   vec (/ symon-sparkline-width 4))
-    (symon--sparkline-draw-vertical-line   vec (/ symon-sparkline-width 2))
-    (symon--sparkline-draw-vertical-line   vec (/ (* symon-sparkline-width 3) 4))
+    (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
+    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
+    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
+    (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
     vec))
 
 ;; + symon monitors
+;;   + define-symon-monitor
 
 ;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
 ;; DISPLAY-FN]. SETUP-FN is called on activation of `symon-mode', and
@@ -193,7 +191,9 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;; Emacs to stop fetching. DISPLAY-FN is called just before displaying
 ;; monitor, and must return display string for the monitor.
 
-;;   + define-symon-monitor
+(defun symon--make-history-ring ()
+  "like `(make-ring symon-history-size)' but filled with `nil'."
+  (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
 (defmacro define-symon-monitor (name &rest plist)
   (let* ((cell (make-vector 2 nil))
