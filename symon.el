@@ -295,6 +295,42 @@ supoprted in PLIST:
                                        " ")))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
+;;   + process management
+
+(defvar symon--process-buffer-name " *symon-process*")
+(defvar symon--process-reference-count 0)
+
+(defun symon--read-value-from-process-buffer (index)
+  "Read a value from a specific buffer"
+  (when (get-buffer symon--process-buffer-name)
+    (with-current-buffer symon--process-buffer-name
+      (when (save-excursion
+              (search-backward-regexp (concat index ":\\([0-9]+\\)\\>") nil t))
+        (read (match-string 1))))))
+
+(defun symon--maybe-start-process (cmd)
+  (setq symon--process-reference-count
+        (1+ symon--process-reference-count))
+  (unless (get-buffer symon--process-buffer-name)
+    (let ((proc (start-process-shell-command
+                 "symon-process" symon--process-buffer-name cmd))
+          (filter (lambda (proc str)
+                    (when (get-buffer symon--process-buffer-name)
+                      (with-current-buffer symon--process-buffer-name
+                        (when (and (string-match "-" str) (search-backward "----" nil t))
+                          (delete-region 1 (point)))
+                        (goto-char (1+ (buffer-size)))
+                        (insert str))))))
+      (set-process-query-on-exit-flag proc nil)
+      (set-process-filter proc filter))))
+
+(defun symon--maybe-kill-process ()
+  (setq symon--process-reference-count
+        (1- symon--process-reference-count))
+  (when (and (zerop symon--process-reference-count)
+             (get-buffer symon--process-buffer-name))
+    (kill-buffer symon--process-buffer-name)))
+
 ;;   + linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
@@ -381,28 +417,38 @@ supoprted in PLIST:
 
 ;;   + darwin monitors
 
+(defun symon-darwin--maybe-start-process ()
+  (symon--maybe-start-process (format "
+while true; do
+    echo \"----\"
+
+    interface=`route get 0.0.0.0 | grep interface | awk '{print $2}'`
+    s=`netstat -bi -I $interface | tail -1`;
+    echo $s | awk '{print \"rx:\"$7}'
+    echo $s | awk '{print \"tx:\"$8}'
+
+    s=`hostinfo  | grep 'Load average' | awk '{print \"cpu:\"$3}' | sed 's/,//'`
+    echo $s
+
+    m1=`sysctl hw.memsize | sed 's/.*:\s*//'`
+    m2=`sysctl hw.usermem | sed 's/.*:\s*//'`
+    s=`echo \"scale=2; (($m2 * 100) / $m1)\"| bc -l`
+    echo \"mem:$s\"
+
+    sleep %d
+done" symon-refresh-rate)))
+
 (define-symon-monitor symon-darwin-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
-  :fetch (if (executable-find "hostinfo")
-             (let* ((str (shell-command-to-string "hostinfo")))
-               (string-match "^Load average: \\(.*\\)," str)
-               (string-to-number (match-string 1 str)))))
+  :setup (symon-darwin--maybe-start-process)
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-darwin-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
-  :fetch (progn
-           (if (executable-find "sysctl")
-               (let* ((str (shell-command-to-string "sysctl hw")))
-                 (string-match "^hw.memsize = \\(.*\\)$" str)
-                 (setq memtotal (string-to-number (match-string 1 str)))
-                 (string-match "^hw.usermem = \\(.*\\)$" str)
-                 (setq usermem (string-to-number (match-string 1 str)))
-                 (/ (* usermem 100) memtotal)))))
-
-(define-symon-monitor symon-darwin-battery-monitor
-  :index "BAT:" :unit "%" :sparkline t
-  :fetch (when battery-status-function
-           (read (cdr (assoc ?p (funcall battery-status-function))))))
+  :setup (symon-darwin--maybe-start-process)
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "mem"))
 
 (defvar symon-darwin--last-network-rx nil)
 
@@ -410,20 +456,14 @@ supoprted in PLIST:
   :index "RX:" :unit "KB/s" :sparkline t
   :lower-bound 100.0
   :upper-bound symon-network-rx-upper-bound
-  :setup (setq symon-darwin--last-network-rx nil)
-  :fetch (progn
-           (if (and (executable-find "route")
-                    (executable-find "netstat"))
-               (progn
-                 (setq str-interface (shell-command-to-string "route get 0.0.0.0"))
-                 (string-match "interface: \\(.*\\)$" str-interface)
-                 (setq interface (match-string 1 str-interface))
-                 (setq str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface)))
-                 (setq rx (string-to-number (nth 6 (split-string str-packets))))
-                 (prog1
-                     (when symon-darwin--last-network-rx
-                       (/ (- rx symon-darwin--last-network-rx) symon-refresh-rate 1000))
-                   (setq symon-darwin--last-network-rx rx))))))
+  :setup (progn
+           (symon-darwin--maybe-start-process)
+           (setq symon-darwin--last-network-rx nil))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (let ((rx (symon--read-value-from-process-buffer "rx")))
+           (prog1 (when symon-darwin--last-network-rx
+                    (/ (- rx symon-darwin--last-network-rx) symon-refresh-rate 1000))
+             (setq symon-darwin--last-network-rx rx))))
 
 (defvar symon-darwin--last-network-tx nil)
 
@@ -431,32 +471,24 @@ supoprted in PLIST:
   :index "TX:" :unit "KB/s" :sparkline t
   :lower-bound 100.0
   :upper-bound symon-network-tx-upper-bound
-  :setup (setq symon-darwin--last-network-tx nil)
-  :fetch (progn
-           (if (and (executable-find "route")
-                    (executable-find "netstat"))
-               (progn
-                 (setq str-interface (shell-command-to-string "route get 0.0.0.0"))
-                 (string-match "interface: \\(.*\\)$" str-interface)
-                 (setq interface (match-string 1 str-interface))
-                 (setq str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface)))
-                 (setq tx (string-to-number (nth 9 (split-string str-packets))))
-                 (prog1
-                     (when symon-darwin--last-network-tx
-                       (/ (- tx symon-darwin--last-network-tx) symon-refresh-rate 1000))
-                   (setq symon-darwin--last-network-tx tx))))))
+  :setup (progn
+           (symon-darwin--maybe-start-process)
+           (setq symon-darwin--last-network-tx nil))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (let ((tx (symon--read-value-from-process-buffer "tx")))
+           (prog1 (when symon-darwin--last-network-tx
+                    (/ (- tx symon-darwin--last-network-tx) symon-refresh-rate 1000))
+             (setq symon-darwin--last-network-tx tx))))
+
+(define-symon-monitor symon-darwin-battery-monitor
+  :index "BAT:" :unit "%" :sparkline t
+  :fetch (when battery-status-function
+           (read (cdr (assoc ?p (funcall battery-status-function))))))
 
 ;;   + windows monitors
 
-(defvar symon-windows--wmi-process-reference-count 0)
-
 (defun symon-windows--maybe-start-wmi-process ()
-  (setq symon-windows--wmi-process-reference-count
-        (1+ symon-windows--wmi-process-reference-count))
-  (unless (get-buffer " *symon-wmi*")
-    (let ((proc (start-process-shell-command
-                 "symon-wmi" " *symon-wmi*"
-                 (format "powershell -command                       \
+  (symon--maybe-start-process (format "powershell -command          \
 $last = 0;                                                          \
 while(1)                                                            \
 {                                                                   \
@@ -490,56 +522,32 @@ while(1)                                                            \
     $last = $p;                                                     \
                                                                     \
     sleep %d                                                        \
-}"
-                         symon-refresh-rate)))
-          (filter (lambda (proc str)
-                    (when (get-buffer " *symon-wmi*")
-                      (with-current-buffer " *symon-wmi*"
-                        (when (and (string-match "-" str) (search-backward "----" nil t))
-                          (delete-region 1 (point)))
-                        (goto-char (1+ (buffer-size)))
-                        (insert str))))))
-      (set-process-query-on-exit-flag proc nil)
-      (set-process-filter proc filter))))
-
-(defun symon-windows--maybe-kill-wmi-process ()
-  (setq symon-windows--wmi-process-reference-count
-        (1- symon-windows--wmi-process-reference-count))
-  (when (and (zerop symon-windows--wmi-process-reference-count)
-             (get-buffer " *symon-wmi*"))
-    (kill-buffer " *symon-wmi*")))
-
-(defun symon-windows--read-value (index)
-  (when (get-buffer " *symon-wmi*")
-    (with-current-buffer " *symon-wmi*"
-      (when (save-excursion
-              (search-backward-regexp (concat index ":\\([0-9]+\\)\\>") nil t))
-        (read (match-string 1))))))
+}" symon-refresh-rate)))
 
 (define-symon-monitor symon-windows-cpu-monitor
   :index "CPU:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "cpu"))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-windows-memory-monitor
   :index "MEM:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "mem"))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "mem"))
 
 (define-symon-monitor symon-windows-page-file-monitor
   :index "PF:" :unit "MB" :sparkline t
   :upper-bound symon-windows-page-file-upper-bound
   :setup (symon-windows--maybe-start-wmi-process)
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "swap"))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "swap"))
 
 (define-symon-monitor symon-windows-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
   :setup (symon-windows--maybe-start-wmi-process)
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (symon-windows--read-value "bat"))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (symon--read-value-from-process-buffer "bat"))
 
 (defvar symon-windows--last-network-rx nil)
 
@@ -549,8 +557,8 @@ while(1)                                                            \
   :setup (progn
            (symon-windows--maybe-start-wmi-process)
            (setq symon-windows--last-network-rx nil))
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (let ((rx (symon-windows--read-value "rx")))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (let ((rx (symon--read-value-from-process-buffer "rx")))
            (prog1 (when symon-windows--last-network-rx
                     (/ (- rx symon-windows--last-network-rx) symon-refresh-rate))
              (setq symon-windows--last-network-rx rx))))
@@ -563,8 +571,8 @@ while(1)                                                            \
   :setup (progn
            (symon-windows--maybe-start-wmi-process)
            (setq symon-windows--last-network-tx nil))
-  :cleanup (symon-windows--maybe-kill-wmi-process)
-  :fetch (let ((tx (symon-windows--read-value "tx")))
+  :cleanup (symon--maybe-kill-process)
+  :fetch (let ((tx (symon--read-value-from-process-buffer "tx")))
            (prog1 (when symon-windows--last-network-tx
                     (/ (- tx symon-windows--last-network-tx) symon-refresh-rate))
              (setq symon-windows--last-network-tx tx))))
