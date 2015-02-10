@@ -143,8 +143,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 ;;   + sparkline types
 
 ;; a sparkline type is a function, which takes no arguments and
-;; returns a (symon-sparkline-height * symon-sparkline-width) bool
-;; vector.
+;; returns a bool vector.
 
 (defun symon--sparkline-draw-horizontal-grid (vec y)
   (dotimes (x/2 (/ symon-sparkline-width 2))
@@ -196,6 +195,63 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   (cons 0 (cons symon-history-size (make-vector symon-history-size nil))))
 
 (defmacro define-symon-monitor (name &rest plist)
+  "define a new symon monitor NAME. following keywords are
+supoprted in PLIST:
+
+:setup (default: nil)
+
+    an expression evaluated when activating symon-mode, and
+    expected to do some preparation.
+
+:cleanup (default: nil)
+
+    an expression evaluated when deactivating symon-mode, and
+    expected to do some cleanup.
+
+:fetch (default: nil)
+
+    an expression that evaluates to the latest status value. the
+    value must be a number (otherwise `N/A' is displayed as the
+    value).
+
+:interval (default: symon-refresh-rate)
+
+    fetch interval in seconds.
+
+:index (default: \"\")
+
+    string prepended to the status value (\"MEM:\" for memory
+    monitor, for example).
+
+:unit (default: \"\")
+
+    string appended to the status value (\"%\" for memory
+    monitor, for example).
+
+:annotation (default: nil)
+
+    an expression that evaluates to the annotation string for the
+    metrics (\"xxxKB Swapped\" for memory monitor, for
+    example). if this expression returns a non-nil value, it is
+    surrounded with parentheses and appended to the status value.
+
+:display (default: nil)
+
+    an expression evaluated before updating symon display. when
+    this expression evaluates to a non-nil value, it will be
+    displayed instead of standard symon display format.
+
+:sparkline (default: nil)
+
+    when non-nil, sparklines are rendered.
+
+:lower-bound (default: 100.0)
+
+    upper bound of sparkline.
+
+:upper-bound (default: 0.0)
+
+    lower bound of sparkline."
   (let* ((cell (make-vector 2 nil))
          (sparkline (plist-get plist :sparkline))
          (interval (or (plist-get plist :interval) 'symon-refresh-rate))
@@ -489,14 +545,6 @@ while(1)                                                            \
 (defun symon--display-end ()
   "deactivate symon display."
   (setq symon--display-active nil))
-
-;; + (backward compatibility)
-
-(defvar symon-sparkline-size nil)
-
-(make-obsolete-variable 'symon-sparkline-size
-                        "symon-sparkline-height, symon-sparkline-width"
-                        "2015/2/8")
 
 ;; + provide
 
