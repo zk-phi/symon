@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.1.1
+;; Version: 1.1.2
 
 ;;; Commentary:
 
@@ -37,13 +37,14 @@
 ;; 1.0.0 first release
 ;; 1.1.0 add option symon-sparkline-thickness
 ;; 1.1.1 add symon-windows-page-file-monitor
+;; 1.1.2 add darwin support (mac os x)
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.1.1")
+(defconst symon-version "1.1.2")
 
 (defgroup symon nil
   "tiny graphical system monitor"
