@@ -434,10 +434,11 @@ supoprted in PLIST:
   :fetch (progn
            (if (and (executable-find "route")
                     (executable-find "netstat"))
-               (let* ((str-interface (shell-command-to-string "route get 0.0.0.0"))
-                      (str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface))))
+               (progn
+                 (setq str-interface (shell-command-to-string "route get 0.0.0.0"))
                  (string-match "interface: \\(.*\\)$" str-interface)
                  (setq interface (match-string 1 str-interface))
+                 (setq str-packets (shell-command-to-string (format "netstat -bi -I %s | tail -1" interface)))
                  (setq tx (string-to-number (nth 9 (split-string str-packets))))
                  (prog1
                      (when symon-darwin--last-network-tx
