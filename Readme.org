@@ -123,3 +123,9 @@ You need to restart =symon-mode= in order to reflect changes of these
 
   - =symon-current-time-monitor= :: current Time (hh::mm) via built-in
        function =format-time-stirng=
+
+** Contributors
+
+- [[https://github.com/pierre-lecocq][Pierre Lecocq]] added darwin support.
+
+Thanks!
