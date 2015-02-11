@@ -89,6 +89,22 @@ You need to restart =symon-mode= in order to reflect changes of these
   - =symon-linux-network-tx-monitor= :: network TX (KB/s) via
        =/proc/net/dev=
 
+- Darwin (Mac OS X)
+
+  - =symon-darwin-memory-monitor= :: memory usage (%) and swapped
+       memory (MB) via =sysctl=
+
+  - =symon-darwin-cpu-monitor= :: CPU load (%) via =hostinfo=
+
+  - =symon-darwin-battery-monitor= :: remaining battery (%) via
+       built-in library =battery.el=
+
+  - =symon-darwin-network-rx-monitor= :: network RX (KB/s) via
+       =netstat=
+
+  - =symon-darwin-network-tx-monitor= :: network TX (KB/s) via
+       =netstat=
+
 - Windows
 
   - =symon-windows-memory-monitor= :: memory usage (%) via =WMI=
