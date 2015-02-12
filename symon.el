@@ -52,6 +52,8 @@
 
 ;; + customs
 
+;; core
+
 (defcustom symon-refresh-rate 3
   "refresh rate of symon display. *set this option BEFORE
   enabling `symon-mode'.*"
@@ -86,6 +88,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "list of monitors used to read system statuses. *set this
   option BEFORE enabling `symon-mode'.*")
 
+;; sparkline
+
 (defcustom symon-sparkline-height 11
   "height of sparklines."
   :group 'symon)
@@ -113,6 +117,8 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 rendering."
   :group 'symon)
 
+;; network monitor
+
 (defcustom symon-network-rx-upper-bound 300
   "upper-bound of sparkline for network RX status."
   :group 'symon)
@@ -120,6 +126,16 @@ rendering."
 (defcustom symon-network-tx-upper-bound 100
   "upper-bound of sparkline for network TX status."
   :group 'symon)
+
+(defcustom symon-network-rx-lower-bound 0
+  "lower-bound of sparkline for network RX status."
+  :group 'symon)
+
+(defcustom symon-network-tx-lower-bound 0
+  "lower-bound of sparkline for network TX status."
+  :group 'symon)
+
+;; page-file monitor
 
 (defcustom symon-windows-page-file-upper-bound 2000
   "upper-bound of sparkline for page file usage."
@@ -413,6 +429,7 @@ supoprted in PLIST:
 (define-symon-monitor symon-linux-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-rx-upper-bound
+  :lower-bound symon-network-rx-lower-bound
   :setup (setq symon-linux--last-network-rx nil)
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
@@ -430,6 +447,7 @@ supoprted in PLIST:
 (define-symon-monitor symon-linux-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-tx-upper-bound
+  :lower-bound symon-network-tx-lower-bound
   :setup (setq symon-linux--last-network-tx nil)
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
@@ -482,8 +500,8 @@ done" symon-refresh-rate)))
 
 (define-symon-monitor symon-darwin-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
-  :lower-bound 100.0
   :upper-bound symon-network-rx-upper-bound
+  :lower-bound symon-network-rx-lower-bound
   :setup (progn
            (symon-darwin--maybe-start-process)
            (setq symon-darwin--last-network-rx nil))
@@ -497,8 +515,8 @@ done" symon-refresh-rate)))
 
 (define-symon-monitor symon-darwin-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
-  :lower-bound 100.0
   :upper-bound symon-network-tx-upper-bound
+  :lower-bound symon-network-tx-lower-bound
   :setup (progn
            (symon-darwin--maybe-start-process)
            (setq symon-darwin--last-network-tx nil))
@@ -582,6 +600,7 @@ while(1)                                                            \
 (define-symon-monitor symon-windows-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-rx-upper-bound
+  :lower-bound symon-network-rx-lower-bound
   :setup (progn
            (symon-windows--maybe-start-wmi-process)
            (setq symon-windows--last-network-rx nil))
@@ -596,6 +615,7 @@ while(1)                                                            \
 (define-symon-monitor symon-windows-network-tx-monitor
   :index "TX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-tx-upper-bound
+  :lower-bound symon-network-tx-lower-bound
   :setup (progn
            (symon-windows--maybe-start-wmi-process)
            (setq symon-windows--last-network-tx nil))
