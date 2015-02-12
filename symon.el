@@ -106,9 +106,11 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "type of sparklines."
   :group 'symon)
 
+;; some darwin builds cannot render xbm images (foreground color is
+;; always black), so convert to xpm before rendering.
 (defcustom symon-sparkline-use-xpm (eq system-type 'darwin)
-  "when non-nil, convert sparkline to xpm from xbm before render
-  it."
+  "when non-nil, convert sparklines to xpm from xbm before
+rendering."
   :group 'symon)
 
 (defcustom symon-network-rx-upper-bound 300
