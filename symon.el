@@ -106,6 +106,11 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "type of sparklines."
   :group 'symon)
 
+(defcustom symon-sparkline-use-xpm (eq system-type 'darwin)
+  "when non-nil, convert sparkline to xpm from xbm before render
+  it."
+  :group 'symon)
+
 (defcustom symon-network-rx-upper-bound 300
   "upper-bound of sparkline for network RX status."
   :group 'symon)
@@ -145,6 +150,25 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
                       t)))))
         `(image :type xbm :data ,image-data :ascent ,symon-sparkline-ascent
                 :height ,symon-sparkline-height :width ,symon-sparkline-width)))))
+
+(defun symon--convert-sparkline-to-xpm (sparkline)
+  "convert sparkline to an xpm image."
+  (let ((data (plist-get (cdr sparkline) :data)))
+    (with-temp-buffer
+      (insert (format "/* XPM */
+static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
+                      symon-sparkline-width symon-sparkline-height
+                      (face-foreground 'default)))
+      (let ((ix 0))
+        (dotimes (x symon-sparkline-height)
+          (insert ",\n\"")
+          (dotimes (y symon-sparkline-width)
+            (insert (if (aref data ix) ?@ ?.))
+            (setq ix (1+ ix)))
+          (insert "\"")))
+      (insert "};")
+      `(image :type xpm :data ,(buffer-string) :ascent ,symon-sparkline-ascent
+              :height ,symon-sparkline-height :width ,symon-sparkline-width))))
 
 ;;   + sparkline types
 
@@ -287,12 +311,14 @@ supoprted in PLIST:
                                      (when annot (concat "(" annot ") ")))))
                          ,(when sparkline
                             `(when (window-system)
-                               (concat (propertize " " 'display
-                                                   (symon--make-sparkline
-                                                    lst
-                                                    ,(plist-get plist :lower-bound)
-                                                    ,(plist-get plist :upper-bound)))
-                                       " ")))))))))
+                               (let ((sparkline (symon--make-sparkline
+                                                 lst
+                                                 ,(plist-get plist :lower-bound)
+                                                 ,(plist-get plist :upper-bound))))
+                                 (when symon-sparkline-use-xpm
+                                   (setq sparkline
+                                         (symon--convert-sparkline-to-xpm sparkline)))
+                                 (concat (propertize " " 'display sparkline) " "))))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
 ;;   + process management
