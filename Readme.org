@@ -71,6 +71,8 @@ You need to restart =symon-mode= in order to reflect changes of these
 
     [[file:img/gridded.png]]
 
+- =symon-center-display= :: Center the display in the minibuffer.
+
 ** Preconfigured Monitors
 
 - GNU/Linux
