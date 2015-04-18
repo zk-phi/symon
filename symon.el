@@ -324,7 +324,7 @@ supoprted in PLIST:
                       (val (car lst)))
                  (concat ,(plist-get plist :index)
                          (if (not (numberp val)) "N/A "
-                           (concat (format "%d%s " val ,(plist-get plist :unit))
+                           (concat (format "%d%s " val ,(or (plist-get plist :unit) ""))
                                    (let ((annot ,(plist-get plist :annotation)))
                                      (when annot (concat "(" annot ") ")))))
                          ,(when sparkline
