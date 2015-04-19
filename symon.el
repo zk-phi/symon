@@ -637,27 +637,25 @@ while(1)                                                            \
 (defvar symon--display-active nil)
 (defvar symon--timer-objects  nil)
 
-;;;###autoload
-(define-minor-mode symon-mode
-  "tiny graphical system monitor"
-  :init-value nil
-  :global t
-  (cond (symon-mode
-         (unless symon-monitors
-           (message "Warning: `symon-monitors' is empty."))
-         (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
-           (mapc (lambda (m) (funcall (aref m 0))) monitors)
-           (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
-                 symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
-                 symon--display-active nil
-                 symon--timer-objects
-                 (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
-                       (run-with-idle-timer symon-delay t 'symon-display)))
-           (add-hook 'pre-command-hook 'symon--display-end)))
-        (t
-         (remove-hook 'pre-command-hook 'symon--display-end)
-         (mapc 'cancel-timer symon--timer-objects)
-         (mapc 'funcall symon--cleanup-fns))))
+(defun symon--initialize ()
+  (unless symon-monitors
+    (message "Warning: `symon-monitors' is empty."))
+  (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
+    (mapc (lambda (m) (funcall (aref m 0))) monitors)
+    (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
+          symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
+          symon--display-active nil
+          symon--timer-objects
+          (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
+                (run-with-idle-timer symon-delay t 'symon-display)))
+    (add-hook 'pre-command-hook 'symon--display-end)
+    (add-hook 'kill-emacs-hook 'symon--cleanup)))
+
+(defun symon--cleanup ()
+  (remove-hook 'kill-emacs-hook 'symon--cleanup)
+  (remove-hook 'pre-command-hook 'symon--display-end)
+  (mapc 'cancel-timer symon--timer-objects)
+  (mapc 'funcall symon--cleanup-fns))
 
 (defun symon-display ()
   "activate symon display."
@@ -674,6 +672,13 @@ while(1)                                                            \
 (defun symon--display-end ()
   "deactivate symon display."
   (setq symon--display-active nil))
+
+;;;###autoload
+(define-minor-mode symon-mode
+  "tiny graphical system monitor"
+  :init-value nil
+  :global t
+  (if symon-mode (symon--initialize) (symon--cleanup)))
 
 ;; + provide
 
