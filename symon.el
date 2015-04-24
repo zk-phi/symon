@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.1.2
+;; Version: 1.1.3
 
 ;;; Commentary:
 
@@ -38,13 +38,14 @@
 ;; 1.1.0 add option symon-sparkline-thickness
 ;; 1.1.1 add symon-windows-page-file-monitor
 ;; 1.1.2 add darwin support (mac os x)
+;; 1.1.3 add option symon-center-display
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.1.2")
+(defconst symon-version "1.1.3")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -108,6 +109,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
 
 (defcustom symon-sparkline-type 'symon-sparkline-type-gridded
   "type of sparklines."
+  :group 'symon)
+
+(defcustom symon-center-display nil
+  "center the display"
   :group 'symon)
 
 ;; some darwin builds cannot render xbm images (foreground color is
@@ -630,6 +635,17 @@ while(1)                                                            \
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))
 
+;;   + misc display
+
+(defun symon--center-minibuffer (width)
+  "Center align the minibuffer content"
+  (let ((lmargin (- (/ (frame-width) 2) (/ width 2))))
+    (set-window-margins (minibuffer-window) lmargin)))
+
+(defun symon--uncenter-minibuffer ()
+  "Left align the minibuffer content"
+    (set-window-margins (minibuffer-window) 0))
+
 ;; + symon core
 
 (defvar symon--cleanup-fns    nil)
@@ -661,6 +677,8 @@ while(1)                                                            \
   "activate symon display."
   (interactive)
   (unless (active-minibuffer-window)
+    (when symon-center-display
+      (symon--center-minibuffer 80))
     (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
       (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
     (setq symon--display-active t)))
@@ -671,6 +689,8 @@ while(1)                                                            \
 
 (defun symon--display-end ()
   "deactivate symon display."
+  (when symon-center-display
+    (symon--uncenter-minibuffer))
   (setq symon--display-active nil))
 
 ;;;###autoload
