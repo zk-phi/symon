@@ -244,7 +244,7 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
 
 (defmacro define-symon-monitor (name &rest plist)
   "define a new symon monitor NAME. following keywords are
-supoprted in PLIST:
+supported in PLIST:
 
 :setup (default: nil)
 
@@ -255,6 +255,11 @@ supoprted in PLIST:
 
     an expression evaluated when deactivating symon-mode, and
     expected to do some cleanup.
+
+:disp-string (default: nil)
+
+   an expression that evaluates to a string. If non-nil, display
+   this string instead of the default numeric value+unit+sparkline(optional)
 
 :fetch (default: nil)
 
@@ -304,6 +309,7 @@ supoprted in PLIST:
          (sparkline (plist-get plist :sparkline))
          (interval (or (plist-get plist :interval) 'symon-refresh-rate))
          (display (plist-get plist :display))
+         (disp-string (plist-get plist :disp-string))
          (update-fn
           `(lambda ()
              (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
@@ -323,10 +329,12 @@ supoprted in PLIST:
                (let* ((lst (ring-elements (aref ,cell 0)))
                       (val (car lst)))
                  (concat ,(plist-get plist :index)
-                         (if (not (numberp val)) "N/A "
-                           (concat (format "%d%s " val ,(or (plist-get plist :unit) ""))
-                                   (let ((annot ,(plist-get plist :annotation)))
-                                     (when annot (concat "(" annot ") ")))))
+                         (if ,disp-string
+                             ,disp-string
+                           (if (not (numberp val)) "N/A "
+                             (concat (format "%d%s " val ,(or (plist-get plist :unit) ""))
+                                     (let ((annot ,(plist-get plist :annotation)))
+                                       (when annot (concat "(" annot ") "))))))
                          ,(when sparkline
                             `(when (window-system)
                                (let ((sparkline (symon--make-sparkline
