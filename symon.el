@@ -660,7 +660,7 @@ while(1)                                                            \
 (defun symon-display ()
   "activate symon display."
   (interactive)
-  (unless (active-minibuffer-window)
+  (unless (or cursor-in-echo-area (active-minibuffer-window))
     (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
       (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
     (setq symon--display-active t)))
