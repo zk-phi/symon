@@ -10,10 +10,11 @@ tiny graphical system monitor
 
 ** NOTE: RECENT INCOMPATIBLE CHANGES
 
-- =symon-initialize= is now obsolete (use =symon-mode= instead)
-- =symon-fetcher= is now obsolete (use =symon-monitors= instead)
-- =symon-sparkline-size= is now obsolete (use =symon-sparkline-height=
-  and =symon-sparkline-width= instead)
+- sparkline types are renamed:
+  - =symon-sparkline-plain= -> =plain=
+  - =symon-sparkline-bounded= -> =bounded=
+  - =symon-sparkline-boxed= -> =boxed=
+  - =symon-sparkline-gridded= -> =gridded=
 
 ** Usage
 
@@ -55,19 +56,19 @@ You need to restart =symon-mode= in order to reflect changes of these
 - =symon-sparkline-type= :: Type of sparklines. following
      preconfigured types are available:
 
-  - =symon-sparkline-type-plain=
+  - =plain=
 
     [[file:img/plain.png]]
 
-  - =symon-sparkline-type-bounded=
+  - =bounded=
 
     [[file:img/bounded.png]]
 
-  - =symon-sparkline-type-boxed=
+  - =boxed=
 
     [[file:img/boxed.png]]
 
-  - =symon-sparkline-type-gridded=
+  - =gridded=
 
     [[file:img/gridded.png]]
 

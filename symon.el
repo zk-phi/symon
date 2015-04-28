@@ -106,7 +106,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "line width of sparklines."
   :group 'symon)
 
-(defcustom symon-sparkline-type 'symon-sparkline-type-gridded
+(defcustom symon-sparkline-type 'gridded
   "type of sparklines."
   :group 'symon)
 
@@ -148,7 +148,7 @@ rendering."
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
     (unless (zerop num-samples)
-      (let* ((image-data (funcall symon-sparkline-type))
+      (let* ((image-data (copy-sequence (get symon-sparkline-type 'symon-sparkline-type)))
              (maximum (if maximum (float maximum) 100.0))
              (minimum (if minimum (float minimum) 0.0))
              (topmargin (1- symon-sparkline-thickness))
@@ -190,9 +190,6 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
 
 ;;   + sparkline types
 
-;; a sparkline type is a function, which takes no arguments and
-;; returns a bool vector.
-
 (defun symon--sparkline-draw-horizontal-grid (vec y)
   (dotimes (x/2 (/ symon-sparkline-width 2))
     (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
@@ -201,32 +198,39 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
   (dotimes (y/2 (/ symon-sparkline-height 2))
     (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
 
-(defun symon-sparkline-type-plain ()
-  "returns a plain sparkline base."
-  (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
+(put 'plain 'symon-sparkline-type
+     (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
 
-(defun symon-sparkline-type-bounded ()
-  "returns a boxed sparkline base."
-  (let ((vec (symon-sparkline-type-plain)))
-    (symon--sparkline-draw-horizontal-grid vec 0)
-    (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
-    vec))
+(put 'bounded 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'plain 'symon-sparkline-type))))
+       (symon--sparkline-draw-horizontal-grid vec 0)
+       (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
+       vec))
 
-(defun symon-sparkline-type-boxed ()
-  "returns a boxed sparkline base."
-  (let ((vec (symon-sparkline-type-bounded)))
-    (symon--sparkline-draw-vertical-grid vec 0)
-    (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
-    vec))
+(put 'boxed 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'bounded 'symon-sparkline-type))))
+       (symon--sparkline-draw-vertical-grid vec 0)
+       (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
+       vec))
 
-(defun symon-sparkline-type-gridded ()
-  "returns a gridded sparkline base."
-  (let ((vec (symon-sparkline-type-boxed)))
-    (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
-    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
-    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
-    (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
-    vec))
+(put 'gridded 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'boxed 'symon-sparkline-type))))
+       (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
+       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
+       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
+       (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
+       vec))
+
+;; aliases (for backward compatibility)
+(dolist (type '(plain bounded boxed gridded))
+  (put (intern (format "symon-sparkline-type-%s" type))
+       'symon-sparkline-type
+       (get type 'symon-sparkline-type)))
+(defadvice symon-mode (after symon-obsolete-sparkline-type-warning activate)
+  (when (and symon-mode
+             (string-match "^symon-sparkline-type" (symbol-name symon-sparkline-type)))
+    (message "symon Warning: obsolete sparkline-type `%s'" symon-sparkline-type)
+    (sit-for 0.5)))
 
 ;; + symon monitors
 ;;   + define-symon-monitor
