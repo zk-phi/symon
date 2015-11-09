@@ -141,8 +141,11 @@ rendering."
   "upper-bound of sparkline for page file usage."
   :group 'symon)
 
-;; + sparklines
+;; + utilities
 ;;   + sparkline generator
+
+;; sparkline-types are internally a symbol with property
+;; 'symon-sparkline-type associated to a 2d-bool-vector.
 
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
@@ -188,41 +191,7 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
       `(image :type xpm :data ,(buffer-string) :ascent ,symon-sparkline-ascent
               :height ,symon-sparkline-height :width ,symon-sparkline-width))))
 
-;;   + sparkline types
-
-(defun symon--sparkline-draw-horizontal-grid (vec y)
-  (dotimes (x/2 (/ symon-sparkline-width 2))
-    (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
-
-(defun symon--sparkline-draw-vertical-grid (vec x)
-  (dotimes (y/2 (/ symon-sparkline-height 2))
-    (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
-
-(put 'plain 'symon-sparkline-type
-     (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
-
-(put 'bounded 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'plain 'symon-sparkline-type))))
-       (symon--sparkline-draw-horizontal-grid vec 0)
-       (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
-       vec))
-
-(put 'boxed 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'bounded 'symon-sparkline-type))))
-       (symon--sparkline-draw-vertical-grid vec 0)
-       (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
-       vec))
-
-(put 'gridded 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'boxed 'symon-sparkline-type))))
-       (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
-       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
-       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
-       (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
-       vec))
-
-;; + symon monitors
-;;   + define-symon-monitor
+;;   + symon monitor generator
 
 ;; a symon monitor is internally a symbol with property 'symon-monitor
 ;; associated to a vector of 3 functions: [SETUP-FN CLEANUP-FN
@@ -369,6 +338,7 @@ supoprted in PLIST:
              (get-buffer symon--process-buffer-name))
     (kill-buffer symon--process-buffer-name)))
 
+;; + predefined monitors
 ;;   + linux monitors
 
 (defun symon-linux--read-lines (file reader indices)
@@ -623,6 +593,39 @@ while(1)                                                            \
 
 (define-symon-monitor symon-current-time-monitor
   :display (format-time-string "%H:%M"))
+
+;; + predefined sparkline types
+
+(defun symon--sparkline-draw-horizontal-grid (vec y)
+  (dotimes (x/2 (/ symon-sparkline-width 2))
+    (aset vec (+ (* y symon-sparkline-width) (* x/2 2)) t)))
+
+(defun symon--sparkline-draw-vertical-grid (vec x)
+  (dotimes (y/2 (/ symon-sparkline-height 2))
+    (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
+
+(put 'plain 'symon-sparkline-type
+     (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
+
+(put 'bounded 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'plain 'symon-sparkline-type))))
+       (symon--sparkline-draw-horizontal-grid vec 0)
+       (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
+       vec))
+
+(put 'boxed 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'bounded 'symon-sparkline-type))))
+       (symon--sparkline-draw-vertical-grid vec 0)
+       (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
+       vec))
+
+(put 'gridded 'symon-sparkline-type
+     (let ((vec (copy-sequence (get 'boxed 'symon-sparkline-type))))
+       (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
+       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
+       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
+       (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
+       vec))
 
 ;; + symon core
 
