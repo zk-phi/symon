@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.1.2
+;; Version: 1.2.0
 
 ;;; Commentary:
 
@@ -38,13 +38,14 @@
 ;; 1.1.0 add option symon-sparkline-thickness
 ;; 1.1.1 add symon-windows-page-file-monitor
 ;; 1.1.2 add darwin support (mac os x)
+;; 1.2.0 add paging feature
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.1.2")
+(defconst symon-version "1.2.0")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -54,7 +55,7 @@
 
 ;; core
 
-(defcustom symon-refresh-rate 3
+(defcustom symon-refresh-rate 4
   "refresh rate of symon display. *set this option BEFORE
   enabling `symon-mode'.*"
   :group 'symon)
@@ -85,8 +86,10 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
            symon-windows-cpu-monitor
            symon-windows-network-rx-monitor
            symon-windows-network-tx-monitor)))
-  "list of monitors used to read system statuses. *set this
-  option BEFORE enabling `symon-mode'.*")
+  "List of monitors used to read system statuses. This variable
+  also can be a list of lists from version 1.2, that case
+  monitors are displayed in multiple pages. *set this option
+  BEFORE enabling `symon-mode'.*")
 
 ;; sparkline
 
@@ -142,6 +145,14 @@ rendering."
   :group 'symon)
 
 ;; + utilities
+;;   + general
+
+(defun symon--flatten (lst)
+  "flatten LST"
+  (if (consp lst)
+      (apply 'nconc (mapcar 'symon--flatten lst))
+    (list lst)))
+
 ;;   + sparkline generator
 
 ;; sparkline-types are internally a symbol with property
@@ -629,19 +640,31 @@ while(1)                                                            \
 
 ;; + symon core
 
-(defvar symon--cleanup-fns    nil)
-(defvar symon--display-fns    nil)
+(defvar symon--cleanup-fns    nil)      ; List[Fn]
+(defvar symon--display-fns    nil)      ; List[List[Fn]]
 (defvar symon--display-active nil)
+(defvar symon--active-page    nil)
+(defvar symon--total-page-num nil)
 (defvar symon--timer-objects  nil)
 
 (defun symon--initialize ()
   (unless symon-monitors
     (message "Warning: `symon-monitors' is empty."))
-  (let ((monitors (mapcar (lambda (s) (get s 'symon-monitor)) symon-monitors)))
-    (mapc (lambda (m) (funcall (aref m 0))) monitors)
-    (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors)
-          symon--display-fns    (mapcar (lambda (m) (aref m 2)) monitors)
+  (let* ((symon-monitors                ; for backward-compatibility
+          (if (symbolp (car symon-monitors))
+              (list symon-monitors)
+            symon-monitors))
+         (monitors
+          (mapcar (lambda (lst)
+                    (mapcar (lambda (s) (get s 'symon-monitor)) lst))
+                  symon-monitors))
+         (monitors-flattened
+          (symon--flatten monitors)))
+    (mapc (lambda (m) (funcall (aref m 0))) monitors-flattened) ; setup-fns
+    (setq symon--cleanup-fns    (mapcar (lambda (m) (aref m 1)) monitors-flattened)
+          symon--display-fns    (mapcar (lambda (l) (mapcar (lambda (m) (aref m 2)) l)) monitors)
           symon--display-active nil
+          symon--total-page-num (length symon-monitors)
           symon--timer-objects
           (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
                 (run-with-idle-timer symon-delay t 'symon-display)))
@@ -654,17 +677,30 @@ while(1)                                                            \
   (mapc 'cancel-timer symon--timer-objects)
   (mapc 'funcall symon--cleanup-fns))
 
+(defun symon--display-update ()
+  "update symon display"
+  (unless (or cursor-in-echo-area (active-minibuffer-window))
+    (let ((message-log-max nil)  ; do not insert to *Messages* buffer
+          (display-string nil)
+          (page 0))
+      (dolist (lst symon--display-fns)
+        (if (= page symon--active-page)
+            (message "%s" (apply 'concat (mapcar 'funcall lst)))
+          (mapc 'funcall lst))
+        (setq page (1+ page))))
+    (setq symon--display-active t)))
+
 (defun symon-display ()
   "activate symon display."
   (interactive)
-  (unless (or cursor-in-echo-area (active-minibuffer-window))
-    (let* ((message-log-max nil))   ; do not insert to *Messages* buffer
-      (message "%s" (apply 'concat (mapcar 'funcall symon--display-fns))))
-    (setq symon--display-active t)))
+  (setq symon--active-page 0)
+  (symon--display-update))
 
 (defun symon--redisplay ()
   "update symon display."
-  (when symon--display-active (symon-display)))
+  (when symon--display-active
+    (setq symon--active-page (% (1+ symon--active-page) symon--total-page-num))
+    (symon--display-update)))
 
 (defun symon--display-end ()
   "deactivate symon display."
