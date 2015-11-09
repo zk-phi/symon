@@ -221,17 +221,6 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
        (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
        vec))
 
-;; aliases (for backward compatibility)
-(dolist (type '(plain bounded boxed gridded))
-  (put (intern (format "symon-sparkline-type-%s" type))
-       'symon-sparkline-type
-       (get type 'symon-sparkline-type)))
-(defadvice symon-mode (after symon-obsolete-sparkline-type-warning activate)
-  (when (and symon-mode
-             (string-match "^symon-sparkline-type" (symbol-name symon-sparkline-type)))
-    (message "symon Warning: obsolete sparkline-type `%s'" symon-sparkline-type)
-    (sit-for 0.5)))
-
 ;; + symon monitors
 ;;   + define-symon-monitor
 
