@@ -224,7 +224,8 @@ static char * sparkline_xpm[] = { \"%d %d 2 1\", \"@ c %s\", \". c none\""
 ;; + symon monitors
 ;;   + define-symon-monitor
 
-;; a symon monitor is a vector of 3 functions: [SETUP-FN CLEANUP-FN
+;; a symon monitor is internally a symbol with property 'symon-monitor
+;; associated to a vector of 3 functions: [SETUP-FN CLEANUP-FN
 ;; DISPLAY-FN]. SETUP-FN is called on activation of `symon-mode', and
 ;; expected to setup Emacs to fetch status values in a specific
 ;; interval. CLEANUP-FN is called on deactivation and expected to tell
