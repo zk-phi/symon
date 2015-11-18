@@ -156,13 +156,27 @@ rendering."
 ;;   + sparkline generator
 
 ;; sparkline-types are internally a symbol with property
-;; 'symon-sparkline-type associated to a 2d-bool-vector.
+;; 'symon-sparkline-type associated to a function that generates a
+;; 2d-bool-vector.
+
+(defvar symon--sparkline-base-cache
+  [nil symon-sparkline-width symon-sparkline-height nil])
+(defun symon--get-sparkline-base ()
+  (unless (and (eq (aref symon--sparkline-base-cache 0) symon-sparkline-type)
+               (= (aref symon--sparkline-base-cache 1) symon-sparkline-width)
+               (= (aref symon--sparkline-base-cache 2) symon-sparkline-height))
+    (aset symon--sparkline-base-cache 0 symon-sparkline-type)
+    (aset symon--sparkline-base-cache 1 symon-sparkline-width)
+    (aset symon--sparkline-base-cache 2 symon-sparkline-height)
+    (aset symon--sparkline-base-cache 3
+          (funcall (get symon-sparkline-type 'symon-sparkline-type))))
+  (copy-sequence (aref symon--sparkline-base-cache 3)))
 
 (defun symon--make-sparkline (list &optional minimum maximum)
   "make sparkline image from LIST."
   (let ((num-samples (length list)))
     (unless (zerop num-samples)
-      (let* ((image-data (copy-sequence (get symon-sparkline-type 'symon-sparkline-type)))
+      (let* ((image-data (symon--get-sparkline-base))
              (maximum (if maximum (float maximum) 100.0))
              (minimum (if minimum (float minimum) 0.0))
              (topmargin (1- symon-sparkline-thickness))
@@ -615,28 +629,33 @@ while(1)                                                            \
   (dotimes (y/2 (/ symon-sparkline-height 2))
     (aset vec (+ (* (* y/2 2) symon-sparkline-width) x) t)))
 
-(put 'plain 'symon-sparkline-type
-     (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
+(defun symon--make-plain-sparkline ()
+  (make-bool-vector (* symon-sparkline-height symon-sparkline-width) nil))
 
-(put 'bounded 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'plain 'symon-sparkline-type))))
-       (symon--sparkline-draw-horizontal-grid vec 0)
-       (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
-       vec))
+(defun symon--make-bounded-sparkline ()
+  (let ((vec (symon--make-plain-sparkline)))
+    (symon--sparkline-draw-horizontal-grid vec 0)
+    (symon--sparkline-draw-horizontal-grid vec (1- symon-sparkline-height))
+    vec))
 
-(put 'boxed 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'bounded 'symon-sparkline-type))))
-       (symon--sparkline-draw-vertical-grid vec 0)
-       (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
-       vec))
+(defun symon--make-boxed-sparkline ()
+  (let ((vec (symon--make-bounded-sparkline)))
+    (symon--sparkline-draw-vertical-grid vec 0)
+    (symon--sparkline-draw-vertical-grid vec (1- symon-sparkline-width))
+    vec))
 
-(put 'gridded 'symon-sparkline-type
-     (let ((vec (copy-sequence (get 'boxed 'symon-sparkline-type))))
-       (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
-       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
-       (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
-       (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
-       vec))
+(defun symon--make-gridded-sparkline ()
+  (let ((vec (symon--make-boxed-sparkline)))
+    (symon--sparkline-draw-horizontal-grid vec (/ symon-sparkline-height 2))
+    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 4))
+    (symon--sparkline-draw-vertical-grid   vec (/ symon-sparkline-width 2))
+    (symon--sparkline-draw-vertical-grid   vec (/ (* symon-sparkline-width 3) 4))
+    vec))
+
+(put 'plain 'symon-sparkline-type 'symon--make-plain-sparkline)
+(put 'bounded 'symon-sparkline-type 'symon--make-bounded-sparkline)
+(put 'boxed 'symon-sparkline-type 'symon--make-boxed-sparkline)
+(put 'gridded 'symon-sparkline-type 'symon--make-gridded-sparkline)
 
 ;; + symon core
 
