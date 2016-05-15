@@ -466,8 +466,10 @@ while true; do
     echo $s
 
     m1=`sysctl hw.memsize | sed 's/.*:\s*//'`
-    m2=`sysctl hw.usermem | sed 's/.*:\s*//'`
-    s=`echo \"scale=2; (($m2 * 100) / $m1)\"| bc -l`
+    m_active=`vm_stat | grep 'Pages active' | sed 's/.*: *//'`
+    m_wired=`vm_stat | grep 'Pages wired' | sed 's/.*: *//'`
+
+    s=`echo \"scale=2; (($m_active+$m_wired)*4096*100 / $m1)\"| bc -l`
     echo \"mem:$s\"
 
     sleep %d
