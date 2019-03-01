@@ -90,6 +90,9 @@ You need to restart =symon-mode= in order to reflect changes of these
   - =symon-linux-network-tx-monitor= :: network TX (KB/s) via
        =/proc/net/dev=
 
+  - =symon-linux-temperature-monitor= :: temperature (°C) via
+       =/sys/bus/platform/devices/coretemp.*=
+
 - Darwin (Mac OS X)
 
   - =symon-darwin-memory-monitor= :: memory usage (%) and swapped
