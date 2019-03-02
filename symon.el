@@ -412,7 +412,11 @@ supoprted in PLIST:
 (define-symon-monitor symon-linux-battery-monitor
   :index "BAT:" :unit "%" :sparkline t
   :fetch (when battery-status-function
-           (read (cdr (assoc ?p (funcall battery-status-function))))))
+           (read (cdr (assoc ?p (funcall battery-status-function)))))
+  :annotation (when battery-status-function
+                (let ((status
+                       (cdr (assoc ?B (funcall battery-status-function)))))
+                  (if (string= status "Discharging") status))))
 
 (defvar symon-linux--last-network-rx nil)
 
