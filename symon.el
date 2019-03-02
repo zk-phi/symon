@@ -420,11 +420,17 @@ supoprted in PLIST:
 
 (defvar symon-linux--last-network-rx nil)
 
+(defvar symon-linux--network-interfaces nil)
+
 (define-symon-monitor symon-linux-network-rx-monitor
   :index "RX:" :unit "KB/s" :sparkline t
   :upper-bound symon-network-rx-upper-bound
   :lower-bound symon-network-rx-lower-bound
-  :setup (setq symon-linux--last-network-rx nil)
+  :setup (progn
+           (setq symon-linux--last-network-rx nil)
+           (setq symon-linux--network-interfaces
+                 (directory-files
+                  "/sys/class/net" nil directory-files-no-dot-files-regexp)))
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
            (goto-char 1)
@@ -434,7 +440,16 @@ supoprted in PLIST:
                  (setq rx (+ rx (read (current-buffer))))))
              (prog1 (when symon-linux--last-network-rx
                       (/ (- rx symon-linux--last-network-rx) symon-refresh-rate 1000))
-               (setq symon-linux--last-network-rx rx)))))
+               (setq symon-linux--last-network-rx rx))))
+  :annotation (cl-some
+               (lambda (interface)
+                 (let ((path
+                        (concat "/sys/class/net/" interface "/operstate")))
+                   (if (string=
+                        "up"
+                        (car (symon-linux--read-lines path 'identity '(""))))
+                       interface)))
+               symon-linux--network-interfaces))
 
 (defvar symon-linux--last-network-tx nil)
 
