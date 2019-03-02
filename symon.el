@@ -144,6 +144,51 @@ rendering."
   "upper-bound of sparkline for page file usage."
   :group 'symon)
 
+;; format monitors
+
+(defcustom symon-cpu-format '("CPU:" "%" t)
+  "formats the cpu monitor. The input is a list of the form
+(index unit with-sparkline-p). *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-memory-format '("MEM:" "%" t t)
+  "formats the memory monitor. The input is a list of the form
+(index unit with-sparkline-p with-annotation-p). *set this option BEFORE
+enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-battery-format '("BAT:" "%" t t)
+  "formats the battery monitor. The input is a list of the form
+(index unit with-sparkline-p with-annotation-p). *set this option BEFORE
+ enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-network-rx-format '("RX:" "KB/s" t t)
+  "formats the rx monitor. The input is a list of the form
+(index unit with-sparkline-p with-annotation-p). *set this option BEFORE
+ enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-network-tx-format '("TX:" "KB/s" t)
+  "formats the tx monitor. The input is a list of the form
+(index unit with-sparkline-p). *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-temperature-format '("TEMP:" "°C" t)
+  "formats the temperature monitor. The input is a list of the form
+(index unit with-sparkline-p). *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-page-file-format '("PF:" "%" t)
+  "formats the page file monitor. The input is a list of the form
+(index unit with-sparkline-p). *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
+(defcustom symon-current-time-format "%H:%M"
+  "formats the current time monitor. Refer to the format-time-string function
+to construct it."
+  :group 'symon)
+
 ;; + utilities
 ;;   + general
 
@@ -289,7 +334,6 @@ supoprted in PLIST:
 
     lower bound of sparkline."
   (let* ((cell (make-vector 2 nil))
-         (sparkline (plist-get plist :sparkline))
          (interval (or (plist-get plist :interval) 'symon-refresh-rate))
          (display (plist-get plist :display))
          (update-fn
@@ -315,16 +359,15 @@ supoprted in PLIST:
                            (concat (format "%d%s " val ,(or (plist-get plist :unit) ""))
                                    (let ((annot ,(plist-get plist :annotation)))
                                      (when annot (concat "(" annot ") ")))))
-                         ,(when sparkline
-                            `(when (window-system)
-                               (let ((sparkline (symon--make-sparkline
-                                                 lst
-                                                 ,(plist-get plist :lower-bound)
-                                                 ,(plist-get plist :upper-bound))))
-                                 (when symon-sparkline-use-xpm
-                                   (setq sparkline
-                                         (symon--convert-sparkline-to-xpm sparkline)))
-                                 (concat (propertize " " 'display sparkline) " "))))))))))
+                         (when (and ,(plist-get plist :sparkline) (window-system))
+                           (let ((sparkline (symon--make-sparkline
+                                             lst
+                                             ,(plist-get plist :lower-bound)
+                                             ,(plist-get plist :upper-bound))))
+                             (when symon-sparkline-use-xpm
+                               (setq sparkline
+                                     (symon--convert-sparkline-to-xpm sparkline)))
+                             (concat (propertize " " 'display sparkline) " ")))))))))
     `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
 
 ;;   + process management
@@ -381,7 +424,9 @@ supoprted in PLIST:
 (defvar symon-linux--last-cpu-ticks nil)
 
 (define-symon-monitor symon-linux-cpu-monitor
-  :index "CPU:" :unit "%" :sparkline t
+  :index (cl-first symon-cpu-format)
+  :unit (cl-second symon-cpu-format)
+  :sparkline (cl-third symon-cpu-format)
   :setup (setq symon-linux--last-cpu-ticks nil)
   :fetch (cl-destructuring-bind (cpu)
              (symon-linux--read-lines
@@ -395,7 +440,9 @@ supoprted in PLIST:
                (setq symon-linux--last-cpu-ticks (cons total idle))))))
 
 (define-symon-monitor symon-linux-memory-monitor
-  :index "MEM:" :unit "%" :sparkline t
+  :index (cl-first symon-memory-format)
+  :unit (cl-second symon-memory-format)
+  :sparkline (cl-third symon-memory-format)
   :fetch (cl-destructuring-bind (memtotal memavailable memfree buffers cached)
              (symon-linux--read-lines
               "/proc/meminfo" (lambda (str) (and str (read str)))
@@ -403,17 +450,21 @@ supoprted in PLIST:
            (if memavailable
                (/ (* (- memtotal memavailable) 100) memtotal)
              (/ (* (- memtotal (+ memfree buffers cached)) 100) memtotal)))
-  :annotation (cl-destructuring-bind (swaptotal swapfree)
-                  (symon-linux--read-lines
-                   "/proc/meminfo" 'read '("SwapTotal:" "SwapFree:"))
-                (let ((swapped (/ (- swaptotal swapfree) 1000)))
-                  (unless (zerop swapped) (format "%dMB Swapped" swapped)))))
+  :annotation (if (cl-fourth symon-memory-format)
+                  (cl-destructuring-bind (swaptotal swapfree)
+                      (symon-linux--read-lines
+                       "/proc/meminfo" 'read '("SwapTotal:" "SwapFree:"))
+                    (let ((swapped (/ (- swaptotal swapfree) 1000)))
+                      (unless (zerop swapped) (format "%dMB Swapped" swapped))))))
 
 (define-symon-monitor symon-linux-battery-monitor
-  :index "BAT:" :unit "%" :sparkline t
+  :index (cl-first symon-battery-format)
+  :unit (cl-second symon-battery-format)
+  :sparkline (cl-third symon-battery-format)
   :fetch (when battery-status-function
            (read (cdr (assoc ?p (funcall battery-status-function)))))
-  :annotation (when battery-status-function
+  :annotation (when (and (cl-fourth symon-battery-format)
+                       battery-status-function)
                 (let ((status
                        (cdr (assoc ?B (funcall battery-status-function)))))
                   (if (string= status "Discharging") status))))
@@ -423,14 +474,19 @@ supoprted in PLIST:
 (defvar symon-linux--network-interfaces nil)
 
 (define-symon-monitor symon-linux-network-rx-monitor
-  :index "RX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-rx-format)
+  :unit (cl-second symon-network-rx-format)
+  :sparkline (cl-third symon-network-rx-format)
   :upper-bound symon-network-rx-upper-bound
   :lower-bound symon-network-rx-lower-bound
   :setup (progn
            (setq symon-linux--last-network-rx nil)
            (setq symon-linux--network-interfaces
-                 (directory-files
-                  "/sys/class/net" nil directory-files-no-dot-files-regexp)))
+                 (if (cl-fourth symon-network-rx-format)
+                     (directory-files
+                      "/sys/class/net"
+                      nil
+                      directory-files-no-dot-files-regexp))))
   :fetch (with-temp-buffer
            (insert-file-contents "/proc/net/dev")
            (goto-char 1)
@@ -441,20 +497,24 @@ supoprted in PLIST:
              (prog1 (when symon-linux--last-network-rx
                       (/ (- rx symon-linux--last-network-rx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-rx rx))))
-  :annotation (cl-some
-               (lambda (interface)
-                 (let ((path
-                        (concat "/sys/class/net/" interface "/operstate")))
-                   (if (string=
-                        "up"
-                        (car (symon-linux--read-lines path 'identity '(""))))
-                       interface)))
-               symon-linux--network-interfaces))
+  :annotation (if (cl-fourth symon-network-rx-format)
+                  (cl-some
+                   (lambda (interface)
+                     (let ((path
+                            (concat "/sys/class/net/" interface "/operstate")))
+                       (if (string=
+                            "up"
+                            (car
+                             (symon-linux--read-lines path 'identity '(""))))
+                           interface)))
+                   symon-linux--network-interfaces)))
 
 (defvar symon-linux--last-network-tx nil)
 
 (define-symon-monitor symon-linux-network-tx-monitor
-  :index "TX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-tx-format)
+  :unit (cl-second symon-network-tx-format)
+  :sparkline (cl-third symon-network-tx-format)
   :upper-bound symon-network-tx-upper-bound
   :lower-bound symon-network-tx-lower-bound
   :setup (setq symon-linux--last-network-tx nil)
@@ -496,13 +556,17 @@ while true; do
 done" symon-refresh-rate)))
 
 (define-symon-monitor symon-darwin-cpu-monitor
-  :index "CPU:" :unit "%" :sparkline t
+  :index (cl-first symon-cpu-format)
+  :unit (cl-second symon-cpu-format)
+  :sparkline (cl-third symon-cpu-format)
   :setup (symon-darwin--maybe-start-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-darwin-memory-monitor
-  :index "MEM:" :unit "%" :sparkline t
+  :index (cl-first symon-memory-format)
+  :unit (cl-second symon-memory-format)
+  :sparkline (cl-third symon-memory-format)
   :setup (symon-darwin--maybe-start-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "mem"))
@@ -510,7 +574,9 @@ done" symon-refresh-rate)))
 (defvar symon-darwin--last-network-rx nil)
 
 (define-symon-monitor symon-darwin-network-rx-monitor
-  :index "RX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-rx-format)
+  :unit (cl-second symon-network-rx-format)
+  :sparkline (cl-third symon-network-rx-format)
   :upper-bound symon-network-rx-upper-bound
   :lower-bound symon-network-rx-lower-bound
   :setup (progn
@@ -525,7 +591,9 @@ done" symon-refresh-rate)))
 (defvar symon-darwin--last-network-tx nil)
 
 (define-symon-monitor symon-darwin-network-tx-monitor
-  :index "TX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-tx-format)
+  :unit (cl-second symon-network-tx-format)
+  :sparkline (cl-third symon-network-tx-format)
   :upper-bound symon-network-tx-upper-bound
   :lower-bound symon-network-tx-lower-bound
   :setup (progn
@@ -538,7 +606,9 @@ done" symon-refresh-rate)))
              (setq symon-darwin--last-network-tx tx))))
 
 (define-symon-monitor symon-darwin-battery-monitor
-  :index "BAT:" :unit "%" :sparkline t
+  :index (cl-first symon-battery-format)
+  :unit (cl-second symon-battery-format)
+  :sparkline (cl-third symon-battery-format)
   :fetch (when battery-status-function
            (read (cdr (assoc ?p (funcall battery-status-function))))))
 
@@ -582,26 +652,34 @@ while(1)                                                            \
 }" symon-refresh-rate)))
 
 (define-symon-monitor symon-windows-cpu-monitor
-  :index "CPU:" :unit "%" :sparkline t
+  :index (cl-first symon-cpu-format)
+  :unit (cl-second symon-cpu-format)
+  :sparkline (cl-third symon-cpu-format)
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "cpu"))
 
 (define-symon-monitor symon-windows-memory-monitor
-  :index "MEM:" :unit "%" :sparkline t
+  :index (cl-first symon-memory-format)
+  :unit (cl-second symon-memory-format)
+  :sparkline (cl-third symon-memory-format)
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "mem"))
 
 (define-symon-monitor symon-windows-page-file-monitor
-  :index "PF:" :unit "MB" :sparkline t
+  :index (cl-first symon-page-file-format)
+  :unit (cl-second symon-page-file-format)
+  :sparkline (cl-third symon-page-file-format)
   :upper-bound symon-windows-page-file-upper-bound
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "swap"))
 
 (define-symon-monitor symon-windows-battery-monitor
-  :index "BAT:" :unit "%" :sparkline t
+  :index (cl-first symon-battery-format)
+  :unit (cl-second symon-battery-format)
+  :sparkline (cl-third symon-battery-format)
   :setup (symon-windows--maybe-start-wmi-process)
   :cleanup (symon--maybe-kill-process)
   :fetch (symon--read-value-from-process-buffer "bat"))
@@ -609,7 +687,9 @@ while(1)                                                            \
 (defvar symon-windows--last-network-rx nil)
 
 (define-symon-monitor symon-windows-network-rx-monitor
-  :index "RX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-rx-format)
+  :unit (cl-second symon-network-rx-format)
+  :sparkline (cl-third symon-network-rx-format)
   :upper-bound symon-network-rx-upper-bound
   :lower-bound symon-network-rx-lower-bound
   :setup (progn
@@ -624,7 +704,9 @@ while(1)                                                            \
 (defvar symon-windows--last-network-tx nil)
 
 (define-symon-monitor symon-windows-network-tx-monitor
-  :index "TX:" :unit "KB/s" :sparkline t
+  :index (cl-first symon-network-tx-format)
+  :unit (cl-second symon-network-tx-format)
+  :sparkline (cl-third symon-network-tx-format)
   :upper-bound symon-network-tx-upper-bound
   :lower-bound symon-network-tx-lower-bound
   :setup (progn
@@ -639,7 +721,7 @@ while(1)                                                            \
 ;;   + misc monitors
 
 (define-symon-monitor symon-current-time-monitor
-  :display (format-time-string "%H:%M"))
+  :display (format-time-string symon-current-time-format))
 
 ;; + predefined sparkline types
 
