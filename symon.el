@@ -144,6 +144,13 @@ rendering."
   "upper-bound of sparkline for page file usage."
   :group 'symon)
 
+;; format monitors
+
+(defcustom symon-temperature-format '("TEMP:" "°C" t)
+  "formats the temperature monitor. The input is a list of the form
+(index unit with-sparkline-p). *set this option BEFORE enabling `symon-mode'.*"
+  :group 'symon)
+
 ;; + utilities
 ;;   + general
 
@@ -378,6 +385,12 @@ supoprted in PLIST:
                     (match-string 1)))))
             indices)))
 
+(defun symon-linux--find-path (path &rest fragments)
+  (if (consp fragments)
+      (let ((p (directory-files path t (car fragments))))
+        (apply #'symon-linux--find-path (car p) (cdr fragments)))
+    path))
+
 (defvar symon-linux--last-cpu-ticks nil)
 
 (define-symon-monitor symon-linux-cpu-monitor
@@ -450,6 +463,28 @@ supoprted in PLIST:
              (prog1 (when symon-linux--last-network-tx
                       (/ (- tx symon-linux--last-network-tx) symon-refresh-rate 1000))
                (setq symon-linux--last-network-tx tx)))))
+
+(defvar symon-linux--temperature-file nil)
+
+(define-symon-monitor symon-linux-temperature-monitor
+  :index (cl-first symon-temperature-format)
+  :unit (cl-second symon-temperature-format)
+  :sparkline (cl-third symon-temperature-format)
+  :setup (setq symon-linux--temperature-file
+               (or (ignore-errors
+                    (symon-linux--find-path
+                     "/sys/bus/platform/devices/"
+                     "coretemp." "temp" "_input"))
+                  (ignore-errors
+                    (symon-linux--find-path
+                     "/sys/bus/platform/devices/"
+                     "coretemp." "hwmon" "hwmon" "_input"))))
+  :fetch (if symon-linux--temperature-file
+             (let ((temperature
+                    (symon-linux--read-lines
+                     symon-linux--temperature-file 'read '(""))))
+               (if temperature (/ (car temperature) 1000) nil))
+           nil))
 
 ;;   + darwin monitors
 
