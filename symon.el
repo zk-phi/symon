@@ -113,6 +113,11 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "type of sparklines."
   :group 'symon)
 
+(defcustom symon-date-time-format "%H:%M"
+  "date and/or time format.
+see https://www.gnu.org/software/emacs/manual/html_node/elisp/Time-Parsing.html for details."
+  :group 'symon)
+
 ;; some darwin builds cannot render xbm images (foreground color is
 ;; always black), so convert to xpm before rendering.
 (defcustom symon-sparkline-use-xpm (eq system-type 'darwin)
@@ -620,7 +625,7 @@ while(1)                                                            \
 ;;   + misc monitors
 
 (define-symon-monitor symon-current-time-monitor
-  :display (format-time-string "%H:%M"))
+  :display (format-time-string symon-date-time-format))
 
 ;; + predefined sparkline types
 
