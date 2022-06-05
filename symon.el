@@ -44,6 +44,7 @@
 
 (require 'battery)
 (require 'ring)
+(require 'cl-lib)
 
 (defconst symon-version "1.2.0")
 
