@@ -39,14 +39,14 @@
 ;; 1.1.1 add symon-windows-page-file-monitor
 ;; 1.1.2 add darwin support (mac os x)
 ;; 1.2.0 add paging feature
-;; 1.2.1 fix fix sparkline cache initialization for Emacs 28+
+;; 1.2.1 fix sparkline cache initialization for Emacs 28+
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.2.0")
+(defconst symon-version "1.2.1")
 
 (defgroup symon nil
   "tiny graphical system monitor"
