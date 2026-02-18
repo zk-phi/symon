@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://hins11.yu-yake.com/
-;; Version: 1.2.0
+;; Version: 1.2.1
 
 ;;; Commentary:
 
@@ -39,13 +39,14 @@
 ;; 1.1.1 add symon-windows-page-file-monitor
 ;; 1.1.2 add darwin support (mac os x)
 ;; 1.2.0 add paging feature
+;; 1.2.1 fix sparkline cache initialization for Emacs 28+
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.2.0")
+(defconst symon-version "1.2.1")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -160,7 +161,7 @@ rendering."
 ;; 2d-bool-vector.
 
 (defvar symon--sparkline-base-cache
-  [nil symon-sparkline-width symon-sparkline-height nil])
+  (vector nil -1 -1 nil))
 (defun symon--get-sparkline-base ()
   (unless (and (eq (aref symon--sparkline-base-cache 0) symon-sparkline-type)
                (= (aref symon--sparkline-base-cache 1) symon-sparkline-width)
