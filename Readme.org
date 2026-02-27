@@ -28,6 +28,22 @@ and turn on =symon-mode=.
 
 then a tiny system monitor is displayed in minibuffer, during idle.
 
+** Note for Emacs 29+ Users
+
+In Emacs v29 and newer installations, you might encounter an issue where sparkline graphics fail to display. You can work around this problem by setting the following variable:
+
+: (setq symon-sparkline-use-xpm t)
+
+For users installing the package via =use-package=, a more idiomatic way to apply this workaround is:
+
+#+begin_src elisp
+  (use-package symon
+    :custom
+    (symon-sparkline-use-xpm t)
+    :config
+    (symon-mode 1))
+#+end_src
+
 ** Customization
 
 - =symon-monitors= :: List of symon monitors used to fetch system
