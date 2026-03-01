@@ -17,8 +17,8 @@
 ;; Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 ;; Author: zk_phi
-;; URL: http://hins11.yu-yake.com/
-;; Version: 1.2.1
+;; URL: http://zk-phi.github.io/
+;; Version: 1.2.2
 
 ;;; Commentary:
 
@@ -40,13 +40,14 @@
 ;; 1.1.2 add darwin support (mac os x)
 ;; 1.2.0 add paging feature
 ;; 1.2.1 fix sparkline cache initialization for Emacs 28+
+;; 1.2.2 use XPM images by default to workaround XBM rendering issues in Emacs 29+
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.2.1")
+(defconst symon-version "1.2.2")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -114,9 +115,7 @@ smaller. *set this option BEFORE enabling `symon-mode'.*"
   "type of sparklines."
   :group 'symon)
 
-;; some darwin builds cannot render xbm images (foreground color is
-;; always black), so convert to xpm before rendering.
-(defcustom symon-sparkline-use-xpm (eq system-type 'darwin)
+(defcustom symon-sparkline-use-xpm t
   "when non-nil, convert sparklines to xpm from xbm before
 rendering."
   :group 'symon)
