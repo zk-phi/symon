@@ -47,6 +47,7 @@
 
 (require 'battery)
 (require 'ring)
+(require 'cl-lib)
 
 (defconst symon-version "1.2.3")
 
@@ -692,7 +693,7 @@ while(1)                                                            \
           symon--total-page-num (length symon-monitors)
           symon--timer-objects
           (list (run-with-timer 0 symon-refresh-rate 'symon--redisplay)
-                (run-with-idle-timer symon-delay t 'symon-display)))
+                (run-with-idle-timer symon-delay symon-refresh-rate 'symon-display)))
     (add-hook 'pre-command-hook 'symon--display-end)
     (add-hook 'kill-emacs-hook 'symon--cleanup)))
 
