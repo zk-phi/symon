@@ -18,7 +18,7 @@
 
 ;; Author: zk_phi
 ;; URL: http://zk-phi.github.io/
-;; Version: 1.2.2
+;; Version: 1.2.3
 
 ;;; Commentary:
 
@@ -41,13 +41,14 @@
 ;; 1.2.0 add paging feature
 ;; 1.2.1 fix sparkline cache initialization for Emacs 28+
 ;; 1.2.2 use XPM images by default to workaround XBM rendering issues in Emacs 29+
+;; 1.2.3 fix ring-insert compatibility for Emacs 30+
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.2.2")
+(defconst symon-version "1.2.3")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -288,27 +289,27 @@ supoprted in PLIST:
 :upper-bound (default: 0.0)
 
     lower bound of sparkline."
-  (let* ((cell (make-vector 2 nil))
+(let* ((cell-sym (intern (format "%s--cell" name)))
          (sparkline (plist-get plist :sparkline))
          (interval (or (plist-get plist :interval) 'symon-refresh-rate))
          (display (plist-get plist :display))
          (update-fn
           `(lambda ()
-             (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
+             (ring-insert (aref ,cell-sym 0) ,(plist-get plist :fetch))))
          (setup-fn
           `(lambda ()
-             (aset ,cell 0 (symon--make-history-ring))
-             (aset ,cell 1 (run-with-timer 0 ,interval ,update-fn))
+             (aset ,cell-sym 0 (symon--make-history-ring))
+             (aset ,cell-sym 1 (run-with-timer 0 ,interval ,update-fn))
              ,(plist-get plist :setup)
              (funcall ,update-fn)))
          (cleanup-fn
           `(lambda ()
-             (cancel-timer (aref ,cell 1))
+             (cancel-timer (aref ,cell-sym 1))
              ,(plist-get plist :cleanup)))
          (display-fn
           (if display `(lambda () (concat ,display " "))
             `(lambda ()
-               (let* ((lst (ring-elements (aref ,cell 0)))
+               (let* ((lst (ring-elements (aref ,cell-sym 0)))
                       (val (car lst)))
                  (concat ,(plist-get plist :index)
                          (if (not (numberp val)) "N/A "
@@ -325,7 +326,9 @@ supoprted in PLIST:
                                    (setq sparkline
                                          (symon--convert-sparkline-to-xpm sparkline)))
                                  (concat (propertize " " 'display sparkline) " "))))))))))
-    `(put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn))))
+    `(progn
+       (defvar ,cell-sym (make-vector 2 nil))
+       (put ',name 'symon-monitor (vector ,setup-fn ,cleanup-fn ,display-fn)))))
 
 ;;   + process management
 
