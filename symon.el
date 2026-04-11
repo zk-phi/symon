@@ -41,13 +41,14 @@
 ;; 1.2.0 add paging feature
 ;; 1.2.1 fix sparkline cache initialization for Emacs 28+
 ;; 1.2.2 use XPM images by default to workaround XBM rendering issues in Emacs 29+
+;; 1.2.3 fix ring-insert compatibility for Emacs 30+
 
 ;;; Code:
 
 (require 'battery)
 (require 'ring)
 
-(defconst symon-version "1.2.2")
+(defconst symon-version "1.2.3")
 
 (defgroup symon nil
   "tiny graphical system monitor"
@@ -294,6 +295,8 @@ supoprted in PLIST:
          (display (plist-get plist :display))
          (update-fn
           `(lambda ()
+	     (unless (aref ,cell 0)
+               (aset ,cell 0 (symon--make-history-ring)))
              (ring-insert (aref ,cell 0) ,(plist-get plist :fetch))))
          (setup-fn
           `(lambda ()
